@@ -1,0 +1,28 @@
+logging:
+  # "-p" (== --print) makes logging obsolet (especially if you are running a systemd service)
+  # file:                           "./__work__/mqtt-logs.log"
+  # print_console:                  true
+  level:                            "debug"  # debug, info, warning, error
+  module_levels:
+    aiohue:                         "warning"
+    asyncio:                        "warning"
+
+hue_bridge:
+    host:                           "<your bridge id>"
+    app_key:                        "<your app token>"
+
+mqtt:
+    host:                           "<mqqt server>"
+    port:                           1883
+    protocol:                       4  # 3==MQTTv31 (default), 4==MQTTv311, 5==default/MQTTv5,
+
+device_defaults:
+    # overwrite in device section
+    retain:                         true
+    state_topic:                    "test/hue/{DEVICE_KEY}/state"
+    cmd_topic:                      "test/hue/{DEVICE_KEY}/cmd"
+    last_will:                      '{"status": "offline"}'
+
+devices:
+    office_group:                   { hue_id: '2dee0fec-5702-4e1f-9fed-c92cfd8dd034' }
+    office_strip:                   { hue_id: 'bcf5f6f5-669e-4a60-afd6-a484962bf2e0' }

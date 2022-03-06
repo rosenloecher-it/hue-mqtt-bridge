@@ -1,0 +1,208 @@
+import logging
+from typing import Optional, List, Dict, Set, Union
+
+import aiohue
+import attr
+from aiohue import HueBridgeV2
+from aiohue.v2 import EventType
+from aiohue.v2.models.feature import OnFeature
+from aiohue.v2.models.grouped_light import GroupedLight
+from aiohue.v2.models.light import Light
+from aiohue.v2.models.room import Room
+
+from src.app_config import ConfigException
+from src.device.device import Device
+from src.hue.hue_command import HueCommand, HueCommandType, SwitchType
+from src.hue.hue_config import HueBridgeConfKey
+from src.hue.hue_event_converter import HueEventConverter
+
+_logger = logging.getLogger(__name__)
+
+
+class HueException(Exception):
+    pass
+
+
+@attr.frozen
+class StateChange:
+
+    event_type: any
+    item: any
+
+
+class HueBridgeBase:
+
+    def __init__(self, config, devices: List[Device]):
+
+        self._host = config[HueBridgeConfKey.HOST]
+        self._app_key = config[HueBridgeConfKey.APP_KEY]
+        self._devices: Dict[str, Device] = {}
+
+        self._bridge: Optional[HueBridgeV2] = None
+
+        for device in devices:
+            self._devices[device.hue_id] = device
+
+    async def connect(self):
+        if self._bridge:
+            await self.close()
+
+        try:
+            self._bridge = HueBridgeV2(self._host, self._app_key)
+        except aiohue.errors.Unauthorized:
+            raise ConfigException("Hue bridge rejected the app token. Do you have to create an app token first (--create-app-key)?")
+
+        await self._bridge.initialize()
+
+    async def close(self):
+        if self._bridge:
+            await self._bridge.close()
+            self._bridge = None
+
+
+class HueBridge(HueBridgeBase):
+
+    def __init__(self, config, devices: List[Device]):
+        super().__init__(config, devices)
+
+        self._state_changes: List[StateChange] = []
+
+        self._cached_grouped_light_ids_to_groups: Dict[str, Room] = {}
+        self._cached_hue_items: Dict[str, Union[Light, GroupedLight]] = {}
+
+    async def connect(self):
+        await super().connect()
+
+        self._bridge.subscribe(self._on_state_changed)
+
+        self._cached_grouped_light_ids_to_groups = {}
+        self._cached_hue_items = {}
+
+        for hue_light in self._bridge.lights:
+            self._on_state_changed(EventType.RESOURCE_UPDATED, hue_light)
+
+        for hue_group in self._bridge.groups:
+            device = self._devices.get(hue_group.id)
+            if device:
+                if isinstance(hue_group, Room):  # Zone is inherited from Room
+                    self._cached_grouped_light_ids_to_groups[hue_group.grouped_light] = hue_group
+                else:
+                    _logger.warning("Only 'Rooms/Zones' are supported as groups. '%s' is of type '%s'. It's ignored!", type(hue_group))
+                    del self._devices[hue_group.id]
+                    continue
+
+        for hue_group in self._bridge.groups:
+            self._on_state_changed(EventType.RESOURCE_UPDATED, hue_group)
+
+        not_found_items = []
+        for device in self._devices.values():
+            if not self._cached_hue_items.get(device.hue_id):
+                not_found_items.append(device.name)
+                # TODO publish offline
+        if not_found_items:
+            _logger.warning("Unknown hue items found (%s)!", ", ".join(not_found_items))
+
+    async def close(self):
+        await super().close()
+
+        self._cached_hue_items = {}
+
+    def _on_state_changed(self, event_type: EventType, item):
+        if not item and not item.id:
+            return
+
+        self._cached_hue_items[item.id] = item
+
+        if isinstance(item, Room):
+            return
+
+        device = self._devices.get(item.id)
+        if not device and isinstance(item, GroupedLight):
+            room_item = self._cached_grouped_light_ids_to_groups.get(item.id)
+            if room_item:
+                device = self._devices.get(room_item.id)
+
+        if not device:
+            return
+
+        device_event = HueEventConverter.to_device_event(event_type, item, device.name)
+        # _logger.debug("_on_state_changed: %s, %s => %s", event_type, item, device_event)
+        device.process_state_change(device_event)
+
+    async def send_device_commands(self):
+        for device in self._devices.values():
+            hue_item = self._cached_hue_items.get(device.hue_id)
+            command = device.get_hue_command()
+            if command and hue_item:
+                try:
+                    await self.send_device_command(device.name, hue_item, command)
+                except HueException as ex:
+                    _logger.warning("command failures ('%s', %s): %s", device.name, command, ex)
+
+    def _find_lights_for_group(self, hue_group: Room):
+        device_children: Dict[str, Set[str]] = {}
+        cached_lights: Dict[str, Light] = {}
+
+        for hue_device in self._bridge.devices:
+            device_children[hue_device.id] = hue_device.lights
+        for hue_light in self._bridge.lights:
+            cached_lights[hue_light.id] = hue_light
+
+        hue_children = []
+
+        if isinstance(hue_group, Room):
+            for child_resource in hue_group.children:
+                child_light_ids = list(device_children.get(child_resource.rid, set()))
+                for child_light_id in child_light_ids:
+                    hue_child = cached_lights.get(child_light_id)
+                    hue_children.append(hue_child)
+
+        if not hue_children:
+            if hasattr(hue_group, "metadata") and hasattr(hue_group.metadata, "name"):
+                name = f"'{hue_group.metadata.name}' ('{hue_group.id}')"
+            else:
+                name = f'{hue_group.id}'
+            _logger.warning("No children found for %s!", name)
+
+        return hue_children
+
+    async def send_device_command(self, device_name: str, hue_item: Union[Light, Room], command: HueCommand):
+        # _logger.debug("send_device_command:\n%s\n%s", hue_item, command)
+
+        if command.type == HueCommandType.SWITCH and command.switch == SwitchType.TOGGLE:
+            on_feature: OnFeature = None
+            if isinstance(hue_item, Room):
+                grouped_light_item = self._cached_hue_items.get(hue_item.grouped_light)
+                if grouped_light_item and hasattr(grouped_light_item, "on") and isinstance(grouped_light_item.on, OnFeature):
+                    on_feature = grouped_light_item.on
+            if on_feature:
+                command = HueCommand.create_switch(SwitchType.OFF if on_feature.on else SwitchType.ON)
+            else:
+                raise HueException("Cannot read OnFeature!")
+
+        if command.type == HueCommandType.DIM and isinstance(hue_item, Light):
+            if not hue_item.supports_dimming:
+                obsolete = command
+                command = HueCommand.create_switch(SwitchType.ON if obsolete.dim and obsolete.dim > 0 else SwitchType.OFF)
+                _logger.info("'%s' supports no dimming (%s), switch instead (%s)!", device_name, obsolete, command)
+
+        if isinstance(hue_item, Light):
+            # on: Optional[bool] = None
+            brightness: Optional[float] = None
+
+            if command.type == HueCommandType.DIM:
+                min_brightness = hue_item.dimming.min_dim_level
+                if not min_brightness or min_brightness < 1:
+                    min_brightness = 1
+                on = command.dim > 0
+                brightness = command.dim if command.dim >= min_brightness else min_brightness
+            elif command.type == HueCommandType.SWITCH:
+                on = True if command.switch == SwitchType.ON else False
+            else:
+                raise ValueError(f"Unsupported command ({command})!")
+
+            await self._bridge.lights.set_state(hue_item.id, on=on, brightness=brightness)
+        elif isinstance(hue_item, Room):
+            hue_children = self._find_lights_for_group(hue_item)
+            for hue_child in hue_children:
+                await self.send_device_command(device_name + "." + hue_child.id, hue_child, command)
