@@ -71,8 +71,7 @@ class MqttProxy:
             self._mqtt_client.publish(topic=m.topic, payload=payload, retain=m.retain)
 
     async def process_timer(self):
-        _logger.debug("process_timer")
-        pass
+        """placeholder for reconnects"""
 
     async def publish_last_wills(self):
         for device in self._devices:
