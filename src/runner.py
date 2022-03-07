@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import logging
+import random
 import signal
 import threading
 from asyncio import Task
@@ -27,7 +28,7 @@ class Runner:
         self._hue_task = None  # type: Optional[Task]
         self._mqtt_task = None  # type: Optional[Task]
 
-        self._hue_next_timer_start = self.get_next_timer_start() + datetime.timedelta(seconds=30)
+        self._hue_next_timer_start = self.get_next_timer_start()
         self._mqtt_next_timer_start = self.get_next_timer_start()
 
         if threading.current_thread() is threading.main_thread():
@@ -98,4 +99,4 @@ class Runner:
 
     @classmethod
     def get_next_timer_start(cls) -> datetime.datetime:
-        return TimeUtils.now() + datetime.timedelta(seconds=60)
+        return TimeUtils.now() + datetime.timedelta(seconds=60 + random.randint(-3, 3))

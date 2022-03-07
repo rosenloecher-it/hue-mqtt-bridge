@@ -1,3 +1,4 @@
+import datetime
 import logging
 from collections import deque
 from typing import Optional, List, Dict, Set, Union, Deque
@@ -16,6 +17,7 @@ from src.device.device import Device
 from src.hue.hue_command import HueCommand, HueCommandType, SwitchType
 from src.hue.hue_config import HueBridgeConfKey
 from src.hue.hue_event_converter import HueEventConverter
+from src.time_utils import TimeUtils
 
 _logger = logging.getLogger(__name__)
 
@@ -72,11 +74,17 @@ class HueBridge(HueBridgeBase):
         self._cached_grouped_light_ids_to_groups: Dict[str, Room] = {}
         self._cached_hue_items: Dict[str, Union[Light, GroupedLight]] = {}
 
+        self._next_refresh_time = self.get_next_refresh_time()
+
     async def connect(self):
         await super().connect()
 
         self._bridge.subscribe(self._on_state_changed)
 
+        self._rebuild_caches()
+        self._next_refresh_time = self.get_next_refresh_time()
+
+    def _rebuild_caches(self):
         self._cached_group_children = {}
         self._cached_grouped_light_ids_to_groups = {}
         self._cached_hue_items = {}
@@ -137,8 +145,12 @@ class HueBridge(HueBridgeBase):
         device.process_state_change(device_event)
 
     async def process_timer(self):
-        _logger.debug("process_timer")
-        pass
+        """placeholder for reconnects or other organisational stuff"""
+        if self._bridge and TimeUtils.now() > self._next_refresh_time:
+            self._next_refresh_time = self.get_next_refresh_time()
+            _logger.info("full refresh")
+            await self._bridge.fetch_full_state()
+            self._rebuild_caches()
 
     def _get_average_brightness_for_group(self, hue_group: Room) -> Optional[float]:
         hue_children = self._get_lights_for_group(hue_group)
@@ -254,3 +266,7 @@ class HueBridge(HueBridgeBase):
             hue_children = self._find_lights_for_group(hue_item)
             for hue_child in hue_children:
                 await self._send_command(device_name + "." + hue_child.id, hue_child, command)
+
+    @classmethod
+    def get_next_refresh_time(cls) -> datetime.datetime:
+        return TimeUtils.now() + datetime.timedelta(seconds=600)
