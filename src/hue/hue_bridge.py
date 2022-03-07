@@ -1,5 +1,6 @@
 import logging
-from typing import Optional, List, Dict, Set, Union
+from collections import deque
+from typing import Optional, List, Dict, Set, Union, Deque
 
 import aiohue
 import attr
@@ -65,8 +66,9 @@ class HueBridge(HueBridgeBase):
     def __init__(self, config, devices: List[Device]):
         super().__init__(config, devices)
 
-        self._state_changes: List[StateChange] = []
+        self._device_commands: Deque[(Device, HueCommand)] = deque()
 
+        self._cached_group_children: Dict[str, Optional[List[Light]]] = {}
         self._cached_grouped_light_ids_to_groups: Dict[str, Room] = {}
         self._cached_hue_items: Dict[str, Union[Light, GroupedLight]] = {}
 
@@ -75,6 +77,7 @@ class HueBridge(HueBridgeBase):
 
         self._bridge.subscribe(self._on_state_changed)
 
+        self._cached_group_children = {}
         self._cached_grouped_light_ids_to_groups = {}
         self._cached_hue_items = {}
 
@@ -126,18 +129,13 @@ class HueBridge(HueBridgeBase):
             return
 
         device_event = HueEventConverter.to_device_event(event_type, item, device.name)
+
         # _logger.debug("_on_state_changed: %s, %s => %s", event_type, item, device_event)
         device.process_state_change(device_event)
 
-    async def send_device_commands(self):
-        for device in self._devices.values():
-            hue_item = self._cached_hue_items.get(device.hue_id)
-            command = device.get_hue_command()
-            if command and hue_item:
-                try:
-                    await self.send_device_command(device.name, hue_item, command)
-                except HueException as ex:
-                    _logger.warning("command failures ('%s', %s): %s", device.name, command, ex)
+    async def process_timer(self):
+        _logger.debug("process_timer")
+        pass
 
     def _find_lights_for_group(self, hue_group: Room):
         device_children: Dict[str, Set[str]] = {}
@@ -158,15 +156,30 @@ class HueBridge(HueBridgeBase):
                     hue_children.append(hue_child)
 
         if not hue_children:
-            if hasattr(hue_group, "metadata") and hasattr(hue_group.metadata, "name"):
-                name = f"'{hue_group.metadata.name}' ('{hue_group.id}')"
-            else:
-                name = f'{hue_group.id}'
-            _logger.warning("No children found for %s!", name)
+            _logger.warning("No children found for '%s' ('%s')!", hue_group.metadata.name, hue_group.id)
 
         return hue_children
 
-    async def send_device_command(self, device_name: str, hue_item: Union[Light, Room], command: HueCommand):
+    def fetch_commands(self) -> bool:
+        for device in self._devices.values():
+            command = device.get_hue_command()
+            if command:
+                self._device_commands.append((device, command))
+        return bool(self._device_commands)
+
+    async def send_commands(self):
+        while self._device_commands:
+            device, command = self._device_commands.popleft()
+
+            hue_item = self._cached_hue_items.get(device.hue_id)
+            if hue_item:
+                try:
+                    await self._send_command(device.name, hue_item, command)
+                except HueException as ex:
+                    _logger.warning("command failures ('%s', %s): %s", device.name, command, ex)
+            # else: hue item does not exist, wrongly configured
+
+    async def _send_command(self, device_name: str, hue_item: Union[Light, Room], command: HueCommand):
         # _logger.debug("send_device_command:\n%s\n%s", hue_item, command)
 
         if command.type == HueCommandType.SWITCH and command.switch == SwitchType.TOGGLE:
@@ -187,7 +200,6 @@ class HueBridge(HueBridgeBase):
                 _logger.info("'%s' supports no dimming (%s), switch instead (%s)!", device_name, obsolete, command)
 
         if isinstance(hue_item, Light):
-            # on: Optional[bool] = None
             brightness: Optional[float] = None
 
             if command.type == HueCommandType.DIM:
@@ -201,8 +213,13 @@ class HueBridge(HueBridgeBase):
             else:
                 raise ValueError(f"Unsupported command ({command})!")
 
-            await self._bridge.lights.set_state(hue_item.id, on=on, brightness=brightness)
+            try:
+                await self._bridge.lights.set_state(hue_item.id, on=on, brightness=brightness)
+            except aiohue.errors.AiohueException as ex:
+                # further analysis needed!
+                _logger.error("error bridge.lights.set_state(%s, %s, %s): %s", hue_item, on, brightness, ex)
+
         elif isinstance(hue_item, Room):
             hue_children = self._find_lights_for_group(hue_item)
             for hue_child in hue_children:
-                await self.send_device_command(device_name + "." + hue_child.id, hue_child, command)
+                await self._send_command(device_name + "." + hue_child.id, hue_child, command)

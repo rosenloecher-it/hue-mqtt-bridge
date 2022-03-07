@@ -10,7 +10,7 @@ from src.time_utils import TimeUtils
 
 
 @attr.frozen
-class DeviceMessage:
+class StateMessage:
 
     topic: str
     payload: Union[str, Dict[str, any]]
@@ -29,7 +29,7 @@ class Device:
 
         self.__logger = None  # type: Optional[Logger]
 
-        self._messages: List[DeviceMessage] = []
+        self._messages: List[StateMessage] = None
         self._hue_command: Optional[HueCommand] = None
 
         self._closed = False
@@ -37,13 +37,14 @@ class Device:
     def close(self):
         if not self._closed:
             if self._last_will:
-                self._messages.append(DeviceMessage(
-                    topic=self._state_topic,
-                    payload=self._last_will,
-                    retain=self._retain
-                ))
+                self._add_state_message(StateMessage(topic=self._state_topic, payload=self._last_will, retain=self._retain))
 
             self._closed = True
+
+    def _add_state_message(self, message: StateMessage):
+        if self._messages is None:
+            self._messages = []
+        self._messages.append(message)
 
     @property
     def hue_id(self) -> str:
@@ -66,9 +67,9 @@ class Device:
         """return MQTT topics the device is listen to"""
         return [self._cmd_topic] if self._cmd_topic else []
 
-    def get_mqtt_messages(self) -> List[DeviceMessage]:
+    def get_state_messages(self) -> Optional[List[StateMessage]]:
         if not self._messages:
-            return []
+            return None
         messages = self._messages
         self._messages = []
         return messages
@@ -124,7 +125,7 @@ class Device:
         # self._logger.debug("process_state_change: %s", event)
         payload = self.event_to_message(event)
 
-        self._messages.append(DeviceMessage(
+        self._add_state_message(StateMessage(
             topic=self._state_topic,
             payload=payload,
             retain=self._retain
