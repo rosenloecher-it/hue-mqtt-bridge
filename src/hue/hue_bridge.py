@@ -119,6 +119,7 @@ class HueBridge(HueBridgeBase):
         if isinstance(item, Room):
             return
 
+        room_item = None
         device = self._devices.get(item.id)
         if not device and isinstance(item, GroupedLight):
             room_item = self._cached_grouped_light_ids_to_groups.get(item.id)
@@ -129,6 +130,8 @@ class HueBridge(HueBridgeBase):
             return
 
         device_event = HueEventConverter.to_device_event(event_type, item, device.name)
+        if room_item is not None:
+            device_event.brightness = self._get_average_brightness_for_group(room_item)
 
         # _logger.debug("_on_state_changed: %s, %s => %s", event_type, item, device_event)
         device.process_state_change(device_event)
@@ -136,6 +139,34 @@ class HueBridge(HueBridgeBase):
     async def process_timer(self):
         _logger.debug("process_timer")
         pass
+
+    def _get_average_brightness_for_group(self, hue_group: Room) -> Optional[float]:
+        hue_children = self._get_lights_for_group(hue_group)
+
+        dimming_count = 0
+        brightness_count = 0
+        brightness_sum = 0
+
+        for hue_child in hue_children:
+            brightness_count += 1
+            if isinstance(hue_child, Light) and hue_child.supports_dimming and hue_child.dimming:
+                dimming_count += 1
+                brightness_sum += hue_child.dimming.brightness
+            else:
+                brightness_sum += 100.0
+
+        if dimming_count == 0:
+            return None
+
+        average = brightness_sum / brightness_count
+        return average
+
+    def _get_lights_for_group(self, hue_group: Room) -> List[Light]:
+        hue_children = self._cached_group_children.get(hue_group.id)
+        if hue_children is None:
+            hue_children = self._find_lights_for_group(hue_group)
+            self._cached_group_children[hue_group.id] = hue_children
+        return hue_children
 
     def _find_lights_for_group(self, hue_group: Room):
         device_children: Dict[str, Set[str]] = {}
