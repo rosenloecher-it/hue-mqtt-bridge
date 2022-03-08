@@ -55,6 +55,22 @@ class Device:
         return self._name
 
     @property
+    def cmd_topic(self) -> str:
+        return self._cmd_topic
+
+    @property
+    def state_topic(self) -> str:
+        return self._state_topic
+
+    @property
+    def last_will(self) -> str:
+        return self._last_will
+
+    @property
+    def retain(self) -> bool:
+        return self._retain
+
+    @property
     def _logger(self):
         if self.__logger is None:
             log_name = self._name or "???"

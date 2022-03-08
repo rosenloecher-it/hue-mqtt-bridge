@@ -11,8 +11,9 @@ from src.app_config import AppConfig, ConfigException, RunMode
 from src.app_logging import AppLogging, LOGGING_CHOICES
 from src.device.device import Device
 from src.device.device_factory import DeviceFactory
-from src.hue.hue_bridge import HueBridge
-from src.hue.hue_tools import HueTools
+from src.hue.hue_app_key import HueAppKey
+from src.hue.hue_bridge import HueBridge, HueBridgeBase
+from src.hue.hue_explore import HueExplore
 from src.mqtt.mqtt_client import MqttClient
 from src.mqtt.mqtt_proxy import MqttProxy
 from src.runner import Runner
@@ -105,8 +106,7 @@ async def testable_main(
     run_mode = AppConfig.determine_run_mode(create_app_key, discover, explore, json_schema)
 
     devices: List[Device] = []
-    hue_bridge: Optional[HueBridge] = None
-    hue_tools: Optional[HueTools] = None
+    hue_bridge: Optional[HueBridgeBase] = None
     mqtt_client: Optional[MqttClient] = None
     mqtt_proxy: Optional[MqttProxy] = None
 
@@ -127,17 +127,19 @@ async def testable_main(
                 hue_bridge = HueBridge(app_config.get_hue_bridge_config(), devices)
                 mqtt_client = MqttClient(app_config.get_mqtt_config())
                 mqtt_proxy = MqttProxy(mqtt_client, devices)
+            elif run_mode == RunMode.CREATE_APP_KEY:
+                hue_bridge = HueAppKey(app_config.get_hue_bridge_config(), devices)
             elif run_mode == RunMode.EXPLORE:
-                hue_tools = HueTools(app_config.get_hue_bridge_config(), devices)
+                hue_bridge = HueExplore(app_config.get_hue_bridge_config(), devices)
 
         if run_mode == RunMode.JSON_SCHEMA:
             AppConfig.print_config_file_json_schema()
         elif run_mode == RunMode.DISCOVER:
-            await HueTools.discover()
+            await HueExplore.discover()
         elif run_mode == RunMode.EXPLORE:
-            await hue_tools.explore()
+            await hue_bridge.run()  # no loop
         elif run_mode == RunMode.CREATE_APP_KEY:
-            await hue_tools.create_app_key()
+            await hue_bridge.run()  # no loop
         else:
             runner = Runner(hue_bridge, mqtt_proxy)
             await runner.run()
@@ -146,8 +148,6 @@ async def testable_main(
         _logger.info("shutdown")
         if mqtt_proxy is not None:
             await mqtt_proxy.close()
-        if hue_tools is not None:
-            await hue_tools.close()
         if hue_bridge is not None:
             await hue_bridge.close()
         if mqtt_client is not None:

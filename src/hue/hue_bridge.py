@@ -57,6 +57,9 @@ class HueBridgeBase:
 
         await self._bridge.initialize()
 
+    async def run(self):
+        pass
+
     async def close(self):
         if self._bridge:
             await self._bridge.close()
