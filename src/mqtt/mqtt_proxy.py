@@ -77,6 +77,7 @@ class MqttProxy:
         for device in self._devices:
             device.close()
 
+        self.fetch_state_changes()
         await self.publish_state_messages()
 
     @classmethod
