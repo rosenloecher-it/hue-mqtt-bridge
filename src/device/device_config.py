@@ -12,18 +12,20 @@ _device_key_info = f"May contain '{DEFAULT_TOPIC_KEY_PATTERN}', which will be re
 
 class DeviceDefaultConfKey:
 
-    RETAIN = "retain"
-    STATE_TOPIC = "state_topic"
     CMD_TOPIC = "cmd_topic"
     LAST_WILL = "last_will"
+    MIN_BRIGHTNESS = "min_brightness"
+    RETAIN = "retain"
+    STATE_TOPIC = "state_topic"
 
 
 class DeviceConfKey:
 
     CMD_TOPIC = "cmd_topic"
-    STATE_TOPIC = "state_topic"
-    RETAIN = "retain"
     HUE_ID = "hue_id"
+    MIN_BRIGHTNESS = "min_brightness"
+    RETAIN = "retain"
+    STATE_TOPIC = "state_topic"
     TYPE = "type"
 
 
@@ -48,6 +50,12 @@ DEVICE_DEFAULTS_JSONSCHEMA = {
             "minLength": 1,
             "description": "Default MQTT last will"
         },
+        DeviceDefaultConfKey.MIN_BRIGHTNESS: {
+            "type": "number",
+            "minimum": 1.0,
+            "maximum": 100.0,
+            "description": "Default min brightness (%). Lower values lads to switching off."
+        },
     },
 }
 
@@ -64,6 +72,12 @@ DEVICE_JSONSCHEMA = {
 
         DeviceConfKey.RETAIN: {"type": "boolean"},
 
+        DeviceConfKey.MIN_BRIGHTNESS: {
+            "type": "number",
+            "minimum": 1.0,
+            "maximum": 100.0,
+            "description": "Default min brightness (%). Lower values lads to switching off."
+        },
         # DeviceConfKey.TYPE: {"type": "string", "enum": DEVICE_TYPES, "description": "Device type"},
     },
 }

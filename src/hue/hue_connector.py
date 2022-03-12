@@ -33,7 +33,7 @@ class StateChange:
     item: any
 
 
-class HueBridgeBase:
+class HueConnectorBase:
 
     def __init__(self, config, devices: List[Device]):
 
@@ -47,6 +47,9 @@ class HueBridgeBase:
             self._devices[device.hue_id] = device
 
     async def connect(self):
+        await self._initialize_hue_bridge()
+
+    async def _initialize_hue_bridge(self):
         if self._bridge:
             await self.close()
 
@@ -57,35 +60,39 @@ class HueBridgeBase:
 
         await self._bridge.initialize()
 
-    async def run(self):
-        pass
-
     async def close(self):
         if self._bridge:
             await self._bridge.close()
             self._bridge = None
 
+    async def run_tools(self):
+        """put main functionality here"""
+        # do nothing in base implemation!
 
-class HueBridge(HueBridgeBase):
+
+class HueConnector(HueConnectorBase):
 
     def __init__(self, config, devices: List[Device]):
         super().__init__(config, devices)
 
         self._device_commands: Deque[(Device, HueCommand)] = deque()
 
-        self._cached_group_children: Dict[str, Optional[List[Light]]] = {}
-        self._cached_grouped_light_ids_to_groups: Dict[str, Room] = {}
+        self._cached_group_children: Dict[str, List[str]] = {}
+        self._cached_grouped_light_ids_to_groups: Dict[str, str] = {}
         self._cached_hue_items: Dict[str, Union[Light, GroupedLight]] = {}
 
         self._next_refresh_time = self.get_next_refresh_time()
 
     async def connect(self):
-        await super().connect()
-
-        self._bridge.subscribe(self._on_state_changed)
+        self._initialize_hue_bridge()
 
         self._rebuild_caches()
         self._next_refresh_time = self.get_next_refresh_time()
+
+    def _initialize_hue_bridge(self):
+        super()._initialize_hue_bridge()
+
+        self._bridge.subscribe(self._on_state_changed)
 
     def _rebuild_caches(self):
         self._cached_group_children = {}
@@ -99,7 +106,10 @@ class HueBridge(HueBridgeBase):
             device = self._devices.get(hue_group.id)
             if device:
                 if isinstance(hue_group, Room):  # Zone is inherited from Room
-                    self._cached_grouped_light_ids_to_groups[hue_group.grouped_light] = hue_group
+                    self._cached_grouped_light_ids_to_groups[hue_group.grouped_light] = hue_group.id
+
+                    hue_children_ids = self._find_lights_for_group(hue_group)
+                    self._cached_group_children[hue_group.id] = hue_children_ids
                 else:
                     _logger.warning("Only 'Rooms/Zones' are supported as groups. '%s' is of type '%s'. It's ignored!", type(hue_group))
                     del self._devices[hue_group.id]
@@ -130,10 +140,12 @@ class HueBridge(HueBridgeBase):
         if isinstance(item, Room):
             return
 
+        # rooms (from grouped light) only
         room_item = None
         device = self._devices.get(item.id)
         if not device and isinstance(item, GroupedLight):
-            room_item = self._cached_grouped_light_ids_to_groups.get(item.id)
+            room_item_id = self._cached_grouped_light_ids_to_groups.get(item.id)
+            room_item = self._cached_hue_items.get(room_item_id)
             if room_item:
                 device = self._devices.get(room_item.id)
 
@@ -142,6 +154,8 @@ class HueBridge(HueBridgeBase):
 
         device_event = HueEventConverter.to_device_event(event_type, item, device.name)
         if room_item is not None:
+            device_event.id = device.hue_id
+            device_event.name = device.name
             device_event.brightness = self._get_average_brightness_for_group(room_item)
 
         # _logger.debug("_on_state_changed: %s, %s => %s", event_type, item, device_event)
@@ -163,12 +177,14 @@ class HueBridge(HueBridgeBase):
         brightness_sum = 0
 
         for hue_child in hue_children:
-            brightness_count += 1
-            if isinstance(hue_child, Light) and hue_child.supports_dimming and hue_child.dimming:
-                dimming_count += 1
-                brightness_sum += hue_child.dimming.brightness
-            else:
-                brightness_sum += 100.0
+            if isinstance(hue_child, Light):
+                brightness_count += 1
+                is_on = hue_child.on.on
+                if hue_child.dimming:
+                    dimming_count += 1
+                    brightness_sum += hue_child.dimming.brightness if is_on else 0
+                else:
+                    brightness_sum += 100.0 if is_on else 0
 
         if dimming_count == 0:
             return None
@@ -177,13 +193,17 @@ class HueBridge(HueBridgeBase):
         return average
 
     def _get_lights_for_group(self, hue_group: Room) -> List[Light]:
-        hue_children = self._cached_group_children.get(hue_group.id)
-        if hue_children is None:
-            hue_children = self._find_lights_for_group(hue_group)
-            self._cached_group_children[hue_group.id] = hue_children
+        hue_children_ids = self._cached_group_children.get(hue_group.id)
+        hue_children = []
+        for hue_child_id in hue_children_ids:
+            hue_child = self._cached_hue_items.get(hue_child_id)
+            if hue_child:
+                hue_children.append(hue_child)
+
         return hue_children
 
-    def _find_lights_for_group(self, hue_group: Room):
+    def _find_lights_for_group(self, hue_group: Room) -> List[str]:
+        """find all light ids for a group"""
         device_children: Dict[str, Set[str]] = {}
         cached_lights: Dict[str, Light] = {}
 
@@ -192,19 +212,19 @@ class HueBridge(HueBridgeBase):
         for hue_light in self._bridge.lights:
             cached_lights[hue_light.id] = hue_light
 
-        hue_children = []
+        hue_children_ids = []
 
         if isinstance(hue_group, Room):
             for child_resource in hue_group.children:
                 child_light_ids = list(device_children.get(child_resource.rid, set()))
                 for child_light_id in child_light_ids:
                     hue_child = cached_lights.get(child_light_id)
-                    hue_children.append(hue_child)
+                    hue_children_ids.append(hue_child.id)
 
-        if not hue_children:
+        if not hue_children_ids:
             _logger.warning("No children found for '%s' ('%s')!", hue_group.metadata.name, hue_group.id)
 
-        return hue_children
+        return hue_children_ids
 
     def fetch_commands(self) -> bool:
         for device in self._devices.values():
@@ -219,56 +239,84 @@ class HueBridge(HueBridgeBase):
 
             hue_item = self._cached_hue_items.get(device.hue_id)
             if hue_item:
+                command = self._prepare_toggle_command(hue_item, command)
+
                 try:
-                    await self._send_command(device.name, hue_item, command)
+                    await self._send_command(hue_item, command)
                 except HueException as ex:
                     _logger.warning("command failures ('%s', %s): %s", device.name, command, ex)
             # else: hue item does not exist, wrongly configured
 
-    async def _send_command(self, device_name: str, hue_item: Union[Light, Room], command: HueCommand):
+    async def _send_command(self, hue_item: Union[Light, Room], command: HueCommand):
         # _logger.debug("send_device_command:\n%s\n%s", hue_item, command)
 
+        command = self._prepare_dim_to_switch_off_command(hue_item, command)
+
+        if isinstance(hue_item, Light):
+            brightness: Optional[float] = None
+
+            if command.type == HueCommandType.DIM:
+                min_brightness = self._get_min_brightness(hue_item)
+                on = command.dim >= min_brightness
+                brightness = command.dim
+            elif command.type == HueCommandType.SWITCH:
+                on = True if command.switch == SwitchType.ON else False
+            else:
+                raise ValueError(f"Unsupported command ({command})!")
+
+            await self._set_light(hue_item, on, brightness)
+
+        elif isinstance(hue_item, Room):
+            hue_children = self._get_lights_for_group(hue_item)
+            for hue_child in hue_children:
+                await self._send_command(hue_child, command)
+
+    async def _set_light(self, hue_item: Light, on: Optional[bool], brightness: Optional[float]):
+        try:
+            await self._bridge.lights.set_state(hue_item.id, on=on, brightness=brightness)
+        except aiohue.errors.AiohueException as ex:
+            # further analysis needed!
+            _logger.error("error bridge.lights.set_state(%s, %s, %s): %s", hue_item, on, brightness, ex)
+
+    def _prepare_dim_to_switch_off_command(self, hue_item: Union[Light, Room], command: HueCommand) -> HueCommand:
+        if command.type == HueCommandType.DIM:
+            min_brightness = self._get_min_brightness(hue_item)
+            if command.dim < min_brightness:  # Room | Light
+                command = HueCommand.create_switch(SwitchType.OFF)
+                return command
+            elif isinstance(hue_item, Light) and not hue_item.supports_dimming:
+                command = HueCommand.create_switch(SwitchType.ON)
+                return command
+
+        return command
+
+    def _get_min_brightness(self, hue_item: Union[Light, Room]) -> float:
+        device = self._devices.get(hue_item.id)
+        min_brightness = device.min_brightness if device else 1
+
+        if isinstance(hue_item, Light):
+            if hue_item.supports_dimming and hue_item.dimming:
+                if min_brightness < hue_item.dimming.min_dim_level:
+                    min_brightness = hue_item.dimming.min_dim_level
+
+        return min_brightness
+
+    def _prepare_toggle_command(self, hue_item: Union[Light, Room], command: HueCommand) -> HueCommand:
         if command.type == HueCommandType.SWITCH and command.switch == SwitchType.TOGGLE:
             on_feature: OnFeature = None
             if isinstance(hue_item, Room):
                 grouped_light_item = self._cached_hue_items.get(hue_item.grouped_light)
                 if grouped_light_item and hasattr(grouped_light_item, "on") and isinstance(grouped_light_item.on, OnFeature):
                     on_feature = grouped_light_item.on
+            elif isinstance(hue_item, Light):
+                on_feature = hue_item.on
+
             if on_feature:
                 command = HueCommand.create_switch(SwitchType.OFF if on_feature.on else SwitchType.ON)
             else:
                 raise HueException("Cannot read OnFeature!")
 
-        if command.type == HueCommandType.DIM and isinstance(hue_item, Light):
-            if not hue_item.supports_dimming:
-                obsolete = command
-                command = HueCommand.create_switch(SwitchType.ON if obsolete.dim and obsolete.dim > 0 else SwitchType.OFF)
-                _logger.info("'%s' supports no dimming (%s), switch instead (%s)!", device_name, obsolete, command)
-
-        if isinstance(hue_item, Light):
-            brightness: Optional[float] = None
-
-            if command.type == HueCommandType.DIM:
-                min_brightness = hue_item.dimming.min_dim_level
-                if not min_brightness or min_brightness < 1:
-                    min_brightness = 1
-                on = command.dim > 0
-                brightness = command.dim if command.dim >= min_brightness else min_brightness
-            elif command.type == HueCommandType.SWITCH:
-                on = True if command.switch == SwitchType.ON else False
-            else:
-                raise ValueError(f"Unsupported command ({command})!")
-
-            try:
-                await self._bridge.lights.set_state(hue_item.id, on=on, brightness=brightness)
-            except aiohue.errors.AiohueException as ex:
-                # further analysis needed!
-                _logger.error("error bridge.lights.set_state(%s, %s, %s): %s", hue_item, on, brightness, ex)
-
-        elif isinstance(hue_item, Room):
-            hue_children = self._find_lights_for_group(hue_item)
-            for hue_child in hue_children:
-                await self._send_command(device_name + "." + hue_child.id, hue_child, command)
+        return command
 
     @classmethod
     def get_next_refresh_time(cls) -> datetime.datetime:

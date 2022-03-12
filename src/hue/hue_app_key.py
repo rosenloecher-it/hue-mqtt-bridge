@@ -2,13 +2,13 @@ import logging
 
 from aiohue import create_app_key
 
-from src.hue.hue_bridge import HueBridgeBase
+from src.hue.hue_connector import HueConnectorBase
 
 
 _logger = logging.getLogger(__name__)
 
 
-class HueAppKey(HueBridgeBase):
+class HueAppKey(HueConnectorBase):
     """Creates a Hue app key"""
 
     async def run(self):

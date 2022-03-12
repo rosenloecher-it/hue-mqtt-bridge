@@ -12,7 +12,7 @@ from src.app_logging import AppLogging, LOGGING_CHOICES
 from src.device.device import Device
 from src.device.device_factory import DeviceFactory
 from src.hue.hue_app_key import HueAppKey
-from src.hue.hue_bridge import HueBridge, HueBridgeBase
+from src.hue.hue_connector import HueConnector, HueConnectorBase
 from src.hue.hue_explore import HueExplore
 from src.mqtt.mqtt_client import MqttClient
 from src.mqtt.mqtt_proxy import MqttProxy
@@ -106,7 +106,7 @@ async def testable_main(
     run_mode = AppConfig.determine_run_mode(create_app_key, discover, explore, json_schema)
 
     devices: List[Device] = []
-    hue_bridge: Optional[HueBridgeBase] = None
+    hue_bridge: Optional[HueConnectorBase] = None
     mqtt_client: Optional[MqttClient] = None
     mqtt_proxy: Optional[MqttProxy] = None
 
@@ -124,7 +124,7 @@ async def testable_main(
                 devices = DeviceFactory.create_devices(app_config.get_devices_config(), app_config.get_device_defaults_config())
 
             if run_mode == RunMode.RUN_SERVICE:
-                hue_bridge = HueBridge(app_config.get_hue_bridge_config(), devices)
+                hue_bridge = HueConnector(app_config.get_hue_bridge_config(), devices)
                 mqtt_client = MqttClient(app_config.get_mqtt_config())
                 mqtt_proxy = MqttProxy(mqtt_client, devices)
             elif run_mode == RunMode.CREATE_APP_KEY:
@@ -137,9 +137,9 @@ async def testable_main(
         elif run_mode == RunMode.DISCOVER:
             await HueExplore.discover()
         elif run_mode == RunMode.EXPLORE:
-            await hue_bridge.run()  # no loop
+            await hue_bridge.run_tools()  # no loop
         elif run_mode == RunMode.CREATE_APP_KEY:
-            await hue_bridge.run()  # no loop
+            await hue_bridge.run_tools()  # no loop
         else:
             runner = Runner(hue_bridge, mqtt_proxy)
             await runner.run()

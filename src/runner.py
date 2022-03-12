@@ -7,7 +7,7 @@ import threading
 from asyncio import Task
 from typing import Callable, Optional
 
-from src.hue.hue_bridge import HueBridge
+from src.hue.hue_connector import HueConnector
 from src.mqtt.mqtt_proxy import MqttProxy
 from src.time_utils import TimeUtils
 
@@ -18,7 +18,7 @@ class Runner:
 
     PROCESSING_TIMEOUT = 10  # seconds
 
-    def __init__(self, hue_bridge: HueBridge, mqtt_proxy: MqttProxy):
+    def __init__(self, hue_bridge: HueConnector, mqtt_proxy: MqttProxy):
 
         self._hue_bridge = hue_bridge
         self._mqtt_proxy = mqtt_proxy

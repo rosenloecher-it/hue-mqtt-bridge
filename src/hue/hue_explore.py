@@ -4,12 +4,11 @@ from collections import OrderedDict
 from typing import Dict, Union
 
 import attr
-from aiohue import create_app_key
 from aiohue.discovery import discover_nupnp
 from aiohue.v2 import DevicesController, LightsController, GroupsController
 from aiohue.v2.models.room import Room
 
-from src.hue.hue_bridge import HueBridgeBase
+from src.hue.hue_connector import HueConnectorBase
 
 
 _logger = logging.getLogger(__name__)
@@ -29,7 +28,7 @@ class HueCache:
     lights: typing.OrderedDict[str, LightsController] = None
 
 
-class HueExplore(HueBridgeBase):
+class HueExplore(HueConnectorBase):
 
     @classmethod
     async def discover(cls):

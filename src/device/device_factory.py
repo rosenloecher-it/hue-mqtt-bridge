@@ -13,6 +13,7 @@ class DeviceFactory:
         default_state_topic = default_config.get(DeviceDefaultConfKey.STATE_TOPIC)
         default_retain = default_config.get(DeviceDefaultConfKey.RETAIN)
         default_last_will = default_config.get(DeviceDefaultConfKey.LAST_WILL)
+        default_min_brightness = default_config.get(DeviceDefaultConfKey.MIN_BRIGHTNESS)
 
         devices: List[Device] = []
         config_errors: List[str] = []
@@ -24,6 +25,9 @@ class DeviceFactory:
             state_topic = device_config.get(DeviceConfKey.RETAIN)
             if state_topic is None and default_state_topic is not None:
                 state_topic = default_state_topic.replace(DEFAULT_TOPIC_KEY_PATTERN, name.lower())
+            min_brightness = device_config.get(DeviceConfKey.MIN_BRIGHTNESS)
+            if min_brightness is None and default_min_brightness is not None:
+                min_brightness = default_config.get(DeviceDefaultConfKey.MIN_BRIGHTNESS)
 
             last_will = device_config.get(DeviceConfKey.RETAIN)
             if last_will is None and default_last_will is not None:
@@ -40,7 +44,8 @@ class DeviceFactory:
                 continue
 
             device = Device(
-                hue_id=hue_id, name=name, cmd_topic=cmd_topic, state_topic=state_topic, last_will=last_will, retain=bool(retain)
+                hue_id=hue_id, name=name, cmd_topic=cmd_topic, state_topic=state_topic, last_will=last_will, retain=bool(retain),
+                min_brightness=min_brightness
             )
             devices.append(device)
 

@@ -19,13 +19,14 @@ class StateMessage:
 
 class Device:
 
-    def __init__(self, hue_id: str, name: str, cmd_topic: str, state_topic: str, last_will: str, retain: bool):
+    def __init__(self, hue_id: str, name: str, cmd_topic: str, state_topic: str, last_will: str, retain: bool, min_brightness: float):
         self._name = name
         self._hue_id = hue_id
         self._cmd_topic = cmd_topic
         self._state_topic = state_topic
         self._last_will = last_will
         self._retain = retain
+        self._min_brightness = min_brightness
 
         self.__logger = None  # type: Optional[Logger]
 
@@ -69,6 +70,10 @@ class Device:
     @property
     def retain(self) -> bool:
         return self._retain
+
+    @property
+    def min_brightness(self) -> float:
+        return self._min_brightness
 
     @property
     def _logger(self):

@@ -55,19 +55,21 @@ class TestHueEventConverter(unittest.TestCase):
             type=ResourceTypes.GROUPED_LIGHT,
         )
 
-    def test_light_item_off(self):
-        hue_item = self.create_light_item_off()
+    def test_light_item(self):
+        for is_on, expected_brightness in [(True, 69.0), (False, 0)]:
+            hue_item = self.create_light_item_off()
+            hue_item.on.on = is_on
 
-        event_exp = DeviceEvent()
-        event_exp.id = hue_item.id
+            event_exp = DeviceEvent()
+            event_exp.id = hue_item.id
 
-        event_exp.name = hue_item.metadata.name
-        event_exp.type = "light"
-        event_exp.status = DeviceStatus.OFF
-        event_exp.brightness = 69.0
+            event_exp.name = hue_item.metadata.name
+            event_exp.type = "light"
+            event_exp.status = DeviceStatus.ON if is_on else DeviceStatus.OFF
+            event_exp.brightness = expected_brightness
 
-        event_out = HueEventConverter.to_device_event(EventType.RESOURCE_UPDATED, hue_item)
-        self.assertEqual(event_exp, event_out)
+            event_out = HueEventConverter.to_device_event(EventType.RESOURCE_UPDATED, hue_item)
+            self.assertEqual(event_exp, event_out)
 
     def test_grouped_light_item_on(self):
         hue_item = self.create_grouped_light_item_on()
