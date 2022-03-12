@@ -60,7 +60,7 @@ class Runner:
                             self._mqtt_task = self._create_task(self._mqtt_proxy.process_timer)
 
                 # Push MQTT commands => devices
-                self._mqtt_proxy.process_device_commands()
+                self._mqtt_proxy.process_thing_commands()
 
                 if self._hue_task:
                     self._hue_task = self._check_or_finish_task(self._hue_task)

@@ -4,7 +4,7 @@ from typing import Optional
 import attr
 
 
-class DeviceStatus(Enum):
+class ThingStatus(Enum):
     ERROR = "error"
     OFF = "off"
     OFFLINE = "offline"
@@ -12,9 +12,9 @@ class DeviceStatus(Enum):
 
 
 @attr.define
-class DeviceEvent:
+class ThingEvent:
 
-    status: Optional[DeviceStatus] = None
+    status: Optional[ThingStatus] = None
     id: Optional[str] = None
     name: Optional[str] = None
     type: Optional[str] = None

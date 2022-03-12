@@ -4,7 +4,7 @@ from typing import Dict, List, Union, Optional
 
 import attr
 
-from src.device.device_event import DeviceEvent
+from src.thing.thing_event import ThingEvent
 from src.hue.hue_command import HueCommand
 from src.time_utils import TimeUtils
 
@@ -17,7 +17,7 @@ class StateMessage:
     retain: bool
 
 
-class Device:
+class Thing:
 
     def __init__(self, hue_id: str, name: str, cmd_topic: str, state_topic: str, last_will: str, retain: bool, min_brightness: float):
         self._name = name
@@ -85,7 +85,7 @@ class Device:
 
     @property
     def mqtt_subscriptions(self) -> List[str]:
-        """return MQTT topics the device is listen to"""
+        """return MQTT topics the thing is listen to"""
         return [self._cmd_topic] if self._cmd_topic else []
 
     def get_state_messages(self) -> Optional[List[StateMessage]]:
@@ -117,7 +117,7 @@ class Device:
             self._hue_command = None
 
     @classmethod
-    def event_to_message(cls, event: DeviceEvent) -> Dict[str, any]:
+    def event_to_message(cls, event: ThingEvent) -> Dict[str, any]:
         # noinspection PyDataclass
         data = attr.asdict(event)
 
@@ -139,7 +139,7 @@ class Device:
 
         return data
 
-    def process_state_change(self, event: DeviceEvent):
+    def process_state_change(self, event: ThingEvent):
         if self._closed:
             return
 

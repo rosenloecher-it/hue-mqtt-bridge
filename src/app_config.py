@@ -7,7 +7,7 @@ import yaml
 from jsonschema import validate
 
 from src.app_logging import LOGGING_JSONSCHEMA
-from src.device.device_config import DEVICES_JSONSCHEMA, DEVICE_DEFAULTS_JSONSCHEMA
+from src.thing.thing_config import THINGS_JSONSCHEMA, THING_DEFAULTS_JSONSCHEMA
 from src.hue.hue_config import HUE_BRIDGE_JSONSCHEMA
 from src.mqtt.mqtt_config import MQTT_JSONSCHEMA
 
@@ -25,19 +25,19 @@ class RunMode(Enum):
 
 
 class AppConfKey:
-    DEVICES = "devices"
-    DEVICES_DEFAULTS = "device_defaults"
     HUE_BRIDGE = "hue_bridge"
     LOGGING = "logging"
     MQTT = "mqtt"
+    THINGS = "things"
+    THING_DEFAULTS = "thing_defaults"
     YAML_TEMPLATES = "yaml_templates"
 
 
 CONFIG_JSONSCHEMA = {
     "type": "object",
     "properties": {
-        AppConfKey.DEVICES: DEVICES_JSONSCHEMA,
-        AppConfKey.DEVICES_DEFAULTS: DEVICE_DEFAULTS_JSONSCHEMA,
+        AppConfKey.THINGS: THINGS_JSONSCHEMA,
+        AppConfKey.THING_DEFAULTS: THING_DEFAULTS_JSONSCHEMA,
         AppConfKey.HUE_BRIDGE: HUE_BRIDGE_JSONSCHEMA,
         AppConfKey.LOGGING: LOGGING_JSONSCHEMA,
         AppConfKey.MQTT: MQTT_JSONSCHEMA,
@@ -52,7 +52,7 @@ CONFIG_JSONSCHEMA = {
         },
     },
     "additionalProperties": False,
-    "required": [AppConfKey.DEVICES, AppConfKey.HUE_BRIDGE, AppConfKey.MQTT],
+    "required": [AppConfKey.THINGS, AppConfKey.HUE_BRIDGE, AppConfKey.MQTT],
 }
 
 
@@ -79,11 +79,11 @@ class AppConfig:
 
         validate(file_data, schema)
 
-    def get_devices_config(self):
-        return self._config_data[AppConfKey.DEVICES]
+    def get_things_config(self):
+        return self._config_data[AppConfKey.THINGS]
 
-    def get_device_defaults_config(self):
-        return self._config_data.get(AppConfKey.DEVICES_DEFAULTS, {})
+    def get_thing_defaults_config(self):
+        return self._config_data.get(AppConfKey.THING_DEFAULTS, {})
 
     def get_hue_bridge_config(self):
         return self._config_data[AppConfKey.HUE_BRIDGE]

@@ -9,8 +9,8 @@ from yaml.parser import ParserError
 
 from src.app_config import AppConfig, ConfigException, RunMode
 from src.app_logging import AppLogging, LOGGING_CHOICES
-from src.device.device import Device
-from src.device.device_factory import DeviceFactory
+from src.thing.thing import Thing
+from src.thing.thing_factory import ThingFactory
 from src.hue.hue_app_key import HueAppKey
 from src.hue.hue_connector import HueConnector, HueConnectorBase
 from src.hue.hue_explore import HueExplore
@@ -70,7 +70,7 @@ def _main(
 ):
     """
     Connect a Philips Hue bridge via MQTT. It's supposed to run as service but offers also some utility functions:
-    creating app tokens, discovering Hue bridges, exploring Hue device and comparing with your configuration
+    creating app tokens, discovering Hue bridges, exploring Hue thing and comparing with your configuration
     """
     # noinspection SpellCheckingInspection
     config_error_code = 78  # sysexits.h: define EX_CONFIG 78 /* configuration error */
@@ -105,7 +105,7 @@ async def testable_main(
     """
     run_mode = AppConfig.determine_run_mode(create_app_key, discover, explore, json_schema)
 
-    devices: List[Device] = []
+    things: List[Thing] = []
     hue_bridge: Optional[HueConnectorBase] = None
     mqtt_client: Optional[MqttClient] = None
     mqtt_proxy: Optional[MqttProxy] = None
@@ -121,16 +121,16 @@ async def testable_main(
             )
 
             if run_mode in [RunMode.RUN_SERVICE, RunMode.EXPLORE]:
-                devices = DeviceFactory.create_devices(app_config.get_devices_config(), app_config.get_device_defaults_config())
+                things = ThingFactory.create_things(app_config.get_things_config(), app_config.get_thing_defaults_config())
 
             if run_mode == RunMode.RUN_SERVICE:
-                hue_bridge = HueConnector(app_config.get_hue_bridge_config(), devices)
+                hue_bridge = HueConnector(app_config.get_hue_bridge_config(), things)
                 mqtt_client = MqttClient(app_config.get_mqtt_config())
-                mqtt_proxy = MqttProxy(mqtt_client, devices)
+                mqtt_proxy = MqttProxy(mqtt_client, things)
             elif run_mode == RunMode.CREATE_APP_KEY:
-                hue_bridge = HueAppKey(app_config.get_hue_bridge_config(), devices)
+                hue_bridge = HueAppKey(app_config.get_hue_bridge_config(), things)
             elif run_mode == RunMode.EXPLORE:
-                hue_bridge = HueExplore(app_config.get_hue_bridge_config(), devices)
+                hue_bridge = HueExplore(app_config.get_hue_bridge_config(), things)
 
         if run_mode == RunMode.JSON_SCHEMA:
             AppConfig.print_config_file_json_schema()

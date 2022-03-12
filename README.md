@@ -68,14 +68,14 @@ chmod 600 ./hue-mqtt-bridge.yaml
 # abort with ctrl+c
 
 # testing - listing to configured topics
-mosquitto_sub -h $SERVER -d -t test/hue/<your-device>/#
+mosquitto_sub -h $SERVER -d -t test/hue/<your-thing>/#
 
-# testing - switch your device
-mosquitto_pub -h $SERVER -d -t test/hue/<your-device>/cmd -m on
-mosquitto_pub -h $SERVER -d -t test/hue/<your-device>/cmd -m off
-mosquitto_pub -h $SERVER -d -t test/hue/<your-device>/cmd -m toggle
-# testing - dim your device (%)
-mosquitto_pub -h $SERVER -d -t test/hue/<your-device>/cmd -m 50
+# testing - switch your thing
+mosquitto_pub -h $SERVER -d -t test/hue/<your-thing>/cmd -m on
+mosquitto_pub -h $SERVER -d -t test/hue/<your-thing>/cmd -m off
+mosquitto_pub -h $SERVER -d -t test/hue/<your-thing>/cmd -m toggle
+# testing - dim your thing (%)
+mosquitto_pub -h $SERVER -d -t test/hue/<your-thing>/cmd -m 50
 ```
 
 ## Register as systemd service

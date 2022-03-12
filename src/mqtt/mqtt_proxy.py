@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Deque
 
 from paho.mqtt.client import MQTTMessage
 
-from src.device.device import Device, StateMessage
+from src.thing.thing import Thing, StateMessage
 from src.mqtt.mqtt_client import MqttClient
 
 _logger = logging.getLogger(__name__)
@@ -14,22 +14,22 @@ _logger = logging.getLogger(__name__)
 
 class MqttProxy:
 
-    def __init__(self, mqtt_client: Optional[MqttClient], devices: List[Device]):
+    def __init__(self, mqtt_client: Optional[MqttClient], things: List[Thing]):
 
         self._mqtt_client = mqtt_client
-        self._devices = devices
+        self._things = things
 
         self._state_messages: Deque[StateMessage] = deque()
 
-        self._command_subscriptions: Dict[str, List[Device]] = {}
-        for device in self._devices:
-            subscriptions = device.mqtt_subscriptions
+        self._command_subscriptions: Dict[str, List[Thing]] = {}
+        for thing in self._things:
+            subscriptions = thing.mqtt_subscriptions
             for subscription in subscriptions:
                 listeners = self._command_subscriptions.get(subscription)
                 if not listeners:
                     listeners = []
                     self._command_subscriptions[subscription] = listeners
-                listeners.append(device)
+                listeners.append(thing)
 
     async def close(self):
         await self.publish_state_messages()  # contains the last wills
@@ -55,8 +55,8 @@ class MqttProxy:
             return False
 
     def fetch_state_changes(self) -> bool:
-        for device in self._devices:
-            state_message = device.get_state_messages()
+        for thing in self._things:
+            state_message = thing.get_state_messages()
             if state_message:
                 self._state_messages.extend(state_message)
 
@@ -74,8 +74,8 @@ class MqttProxy:
         """placeholder for reconnects"""
 
     async def publish_last_wills(self):
-        for device in self._devices:
-            device.close()
+        for thing in self._things:
+            thing.close()
 
         self.fetch_state_changes()
         await self.publish_state_messages()
@@ -85,7 +85,7 @@ class MqttProxy:
         if isinstance(value_in, bytes):
             return value_in.decode("utf-8")
 
-    def process_device_commands(self):
+    def process_thing_commands(self):
         """dispatch incoming MQTT command to devices"""
         if not self._mqtt_client:
             return
@@ -93,7 +93,7 @@ class MqttProxy:
         messages: List[MQTTMessage] = self._mqtt_client.get_messages()
         for message in messages:
             topic = message.topic
-            listeners: List[Device] = self._command_subscriptions.get(topic)
+            listeners: List[Thing] = self._command_subscriptions.get(topic)
             if listeners:
                 payload = self.ensure_string(message.payload)
                 for listener in listeners:

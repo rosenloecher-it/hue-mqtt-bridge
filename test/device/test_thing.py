@@ -4,11 +4,11 @@ from unittest import mock
 
 from tzlocal import get_localzone
 
-from src.device.device import Device
-from src.device.device_event import DeviceEvent, DeviceStatus
+from src.thing.thing import Thing
+from src.thing.thing_event import ThingEvent, ThingStatus
 
 
-class TestDevice(unittest.TestCase):
+class TestThing(unittest.TestCase):
 
     # noinspection PyTypeChecker
     @mock.patch("src.time_utils.TimeUtils.now")
@@ -16,11 +16,11 @@ class TestDevice(unittest.TestCase):
         timestamp = datetime.datetime(2022, 1, 30, 10, 0, 0, tzinfo=get_localzone())
         mocked_now.return_value = timestamp
 
-        e = DeviceEvent()
+        e = ThingEvent()
         e.id = "e1"
         e.name = "hue name"
         e.type = "light"
-        e.status = DeviceStatus.OFF
+        e.status = ThingStatus.OFF
         e.brightness = 68.9
 
         expected = {
@@ -32,6 +32,6 @@ class TestDevice(unittest.TestCase):
             "timestamp": timestamp.isoformat(),
         }
 
-        message = Device.event_to_message(e)
+        message = Thing.event_to_message(e)
 
         self.assertEqual(expected, message)

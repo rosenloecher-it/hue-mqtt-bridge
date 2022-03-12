@@ -16,13 +16,13 @@ mqtt:
     port:                           1883
     protocol:                       4  # 3==MQTTv31 (default), 4==MQTTv311, 5==default/MQTTv5,
 
-device_defaults:
-    # overwrite in device section
+thing_defaults:
+    # overwrite in things section
     retain:                         true
-    state_topic:                    "test/hue/{DEVICE_KEY}/state"
-    cmd_topic:                      "test/hue/{DEVICE_KEY}/cmd"
+    state_topic:                    "test/hue/{THING_KEY}/state"
+    cmd_topic:                      "test/hue/{THING_KEY}/cmd"
     last_will:                      '{"status": "offline"}'
 
-devices:
+things:
     office_group:                   { hue_id: '2dee0fec-5702-4e1f-9fed-c92cfd8dd034' }
     office_strip:                   { hue_id: 'bcf5f6f5-669e-4a60-afd6-a484962bf2e0' }

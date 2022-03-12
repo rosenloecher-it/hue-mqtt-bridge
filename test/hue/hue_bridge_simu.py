@@ -11,7 +11,7 @@ from aiohue.v2.models.light import Light, LightMetaData, LightMode
 from aiohue.v2.models.resource import ResourceIdentifier, ResourceTypes
 from aiohue.v2.models.room import Room
 
-import src.device.device as app_device
+from src.thing.thing import Thing
 
 
 class _SimuDefault:
@@ -23,7 +23,7 @@ class _SimuDefault:
     DEFAULT_RETAIN = True
 
 
-class DeviceSimu(app_device.Device):
+class ThingSimu(Thing):
 
     def __init__(self, hue_item, min_brightness):
         super().__init__(
@@ -39,7 +39,7 @@ class DeviceSimu(app_device.Device):
         self.hue_item = hue_item
 
 
-class LightSimu(DeviceSimu):
+class LightSimu(ThingSimu):
 
     def __init__(self, hue_item, hue_device: Device, hue_room=None):
         super().__init__(hue_item, _SimuDefault.MIN_DIM_LIGHT)
@@ -51,7 +51,7 @@ class LightSimu(DeviceSimu):
         self.hue_room: Room = hue_room
 
 
-class RoomSimu(DeviceSimu):
+class RoomSimu(ThingSimu):
 
     def __init__(self, hue_item, hue_lights: List[Light], hue_grouped_light: GroupedLight):
         super().__init__(hue_item, _SimuDefault.MIN_DIM_GROUP)
@@ -93,16 +93,16 @@ class HueBridgeSimu:
         hue_lights = []
         hue_groups = []
 
-        config_devices = cls.configurable_devices()
-        for config_device in config_devices:
+        configurable_things = cls.configurable_things()
+        for configurable_thing in configurable_things:
 
-            if isinstance(config_device, LightSimu):
-                hue_lights.append(config_device.hue_item)
-                hue_devices.append(config_device.hue_device)
+            if isinstance(configurable_thing, LightSimu):
+                hue_lights.append(configurable_thing.hue_item)
+                hue_devices.append(configurable_thing.hue_device)
 
-            elif isinstance(config_device, RoomSimu):
-                hue_groups.append(config_device.hue_item)
-                hue_groups.append(config_device.hue_grouped_light)
+            elif isinstance(configurable_thing, RoomSimu):
+                hue_groups.append(configurable_thing.hue_item)
+                hue_groups.append(configurable_thing.hue_grouped_light)
 
             else:
                 raise ValueError("Wrong type")
@@ -115,22 +115,22 @@ class HueBridgeSimu:
         return bridge
 
     @classmethod
-    def configurable_devices(cls) -> List[app_device.Device]:
-        switch_device_id = "device-" + cls.ID_SWITCH
+    def configurable_things(cls) -> List[Thing]:
+        switch_device_id = "thing-" + cls.ID_SWITCH
         hue_item = cls.create_hue_switch_light(cls.ID_SWITCH, switch_device_id)
         hue_device = cls.create_hue_device(switch_device_id, hue_item.id)
         simu_switch = LightSimu(hue_item, hue_device)
 
-        switch_device_id = "device-" + cls.ID_DIMMER
+        switch_device_id = "thing-" + cls.ID_DIMMER
         hue_item = cls.create_hue_dim_light(cls.ID_DIMMER, switch_device_id)
         hue_device = cls.create_hue_device(switch_device_id, hue_item.id)
         simu_dimmer = LightSimu(hue_item, hue_device)
 
-        switch_device_id = "device-" + cls.ID_COLOR1
+        switch_device_id = "thing-" + cls.ID_COLOR1
         hue_color1 = cls.create_hue_color_light(cls.ID_COLOR1, switch_device_id)
         hue_device1 = cls.create_hue_device(switch_device_id, hue_color1.id)
 
-        switch_device_id = "device-" + cls.ID_COLOR2
+        switch_device_id = "thing-" + cls.ID_COLOR2
         hue_color2 = cls.create_hue_color_light(cls.ID_COLOR2, switch_device_id)
         hue_device2 = cls.create_hue_device(switch_device_id, hue_color2.id)
 

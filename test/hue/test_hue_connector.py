@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, call
 from aiohue.v2 import EventType
 from aiohue.v2.models.light import Light
 
-from src.device.device import Device, StateMessage
+from src.thing.thing import Thing, StateMessage
 from src.hue.hue_command import HueCommand, HueCommandType, SwitchType
 from src.hue.hue_config import HueBridgeConfKey
 from src.hue.hue_connector import HueConnector
@@ -18,15 +18,15 @@ from test.hue.hue_bridge_simu import HueBridgeSimu, RoomSimu
 # noinspection PyProtectedMember
 class HueConnectorSimu(HueConnector):
 
-    def __init__(self, devices: Optional[List[Device]] = None):
+    def __init__(self, things: Optional[List[Thing]] = None):
         config = {
             HueBridgeConfKey.HOST: "dummy_host",
             HueBridgeConfKey.APP_KEY: "dummy_app_key",
         }
-        if devices is None:
-            devices = HueBridgeSimu.configurable_devices()
+        if things is None:
+            things = HueBridgeSimu.configurable_things()
 
-        super().__init__(config, devices)
+        super().__init__(config, things)
 
         self.set_light = None
 
@@ -35,13 +35,13 @@ class HueConnectorSimu(HueConnector):
     def reset_actions(self):
         self.set_light = MagicMock("set_light")
 
-        for device in self._devices.values():
+        for device in self._things.values():
             device.get_state_messages()  # messages gets removed too
 
     def get_state_message(self, remove_timestamps=True) -> List[StateMessage]:
         state_messages = []
-        for device in self._devices.values():
-            messages = device.get_state_messages()
+        for thing in self._things.values():
+            messages = thing.get_state_messages()
             if messages:
                 for message in messages:
                     if remove_timestamps:
@@ -49,24 +49,24 @@ class HueConnectorSimu(HueConnector):
                     state_messages.append(message)
         return state_messages
 
-    def _initialize_hue_bridge(self):
+    async def _initialize_hue_bridge(self):
         self._bridge = HueBridgeSimu.create_hue_bridge()
 
     async def simu_command(self, device_key: str, command: str):
-        device = self._devices[device_key]
-        device.process_mqtt_command(device._cmd_topic, command)
+        thing = self._things[device_key]
+        thing.process_mqtt_command(thing._cmd_topic, command)
 
         result = self.fetch_commands()
         assert result  # must be fetched
 
         await self.send_commands()
 
-        device = self._devices.get(device_key)
-        if isinstance(device, RoomSimu):
+        thing = self._things.get(device_key)
+        if isinstance(thing, RoomSimu):
             hue_command = HueCommand.parse(command)
             if hue_command.type == HueCommandType.SWITCH:
                 # simu changed group light
-                updated_group_light = copy.deepcopy(device.hue_grouped_light)
+                updated_group_light = copy.deepcopy(thing.hue_grouped_light)
                 if hue_command.switch == SwitchType.ON:
                     updated_group_light.on.on = True
                 elif hue_command.switch == SwitchType.OFF:

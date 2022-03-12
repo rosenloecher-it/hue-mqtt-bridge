@@ -130,26 +130,26 @@ class HueExplore(HueConnectorBase):
 
     def _print_config(self, hue_cache: HueCache):
         print()
-        print("CONFIGURED DEVICES")
+        print("CONFIGURED THINGS")
 
-        devices = sorted(self._devices.values(), key=lambda d: d.name.lower())
+        things = sorted(self._things.values(), key=lambda d: d.name.lower())
 
-        for device in devices:
+        for thing in things:
             offset = self.get_offset(1)
-            print(f"{offset}CONFIGURED DEVICE: {device.name}")
+            print(f"{offset}CONFIGURED THING: {thing.name}")
 
             offset = self.get_offset(2)
-            hue_item = hue_cache.rooms.get(device.hue_id) or hue_cache.lights.get(device.hue_id)
+            hue_item = hue_cache.rooms.get(thing.hue_id) or hue_cache.lights.get(thing.hue_id)
             if hue_item:
                 print(f"{offset}HUE ITEM:      {hue_item.type} {hue_item.name} ({hue_item.item.id})")
             else:
                 print(f"{offset}HUE ITEM:      NOT FOUND !?")
-            print(f"{offset}COMMAND TOPIC: {device.cmd_topic}")
-            print(f"{offset}STATE TOPIC:   {device.state_topic}")
-            print(f"{offset}RETAIN:        [" + ("X" if device.retain else " ") + "]")
-            print(f"{offset}LAST WILL:     {device.last_will}")
+            print(f"{offset}COMMAND TOPIC: {thing.cmd_topic}")
+            print(f"{offset}STATE TOPIC:   {thing.state_topic}")
+            print(f"{offset}RETAIN:        [" + ("X" if thing.retain else " ") + "]")
+            print(f"{offset}LAST WILL:     {thing.last_will}")
 
-    async def run(self):
+    async def run_tools(self):
         if not self._bridge:
             await self.connect()
 

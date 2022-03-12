@@ -13,7 +13,7 @@ from aiohue.v2.models.light import Light
 from aiohue.v2.models.room import Room
 
 from src.app_config import ConfigException
-from src.device.device import Device
+from src.thing.thing import Thing
 from src.hue.hue_command import HueCommand, HueCommandType, SwitchType
 from src.hue.hue_config import HueBridgeConfKey
 from src.hue.hue_event_converter import HueEventConverter
@@ -35,16 +35,16 @@ class StateChange:
 
 class HueConnectorBase:
 
-    def __init__(self, config, devices: List[Device]):
+    def __init__(self, config, things: List[Thing]):
 
         self._host = config[HueBridgeConfKey.HOST]
         self._app_key = config[HueBridgeConfKey.APP_KEY]
-        self._devices: Dict[str, Device] = {}
+        self._things: Dict[str, Thing] = {}
 
         self._bridge: Optional[HueBridgeV2] = None
 
-        for device in devices:
-            self._devices[device.hue_id] = device
+        for thing in things:
+            self._things[thing.hue_id] = thing
 
     async def connect(self):
         await self._initialize_hue_bridge()
@@ -72,10 +72,10 @@ class HueConnectorBase:
 
 class HueConnector(HueConnectorBase):
 
-    def __init__(self, config, devices: List[Device]):
-        super().__init__(config, devices)
+    def __init__(self, config, things: List[Thing]):
+        super().__init__(config, things)
 
-        self._device_commands: Deque[(Device, HueCommand)] = deque()
+        self._thing_commands: Deque[(Thing, HueCommand)] = deque()
 
         self._cached_group_children: Dict[str, List[str]] = {}
         self._cached_grouped_light_ids_to_groups: Dict[str, str] = {}
@@ -84,13 +84,13 @@ class HueConnector(HueConnectorBase):
         self._next_refresh_time = self.get_next_refresh_time()
 
     async def connect(self):
-        self._initialize_hue_bridge()
+        await self._initialize_hue_bridge()
 
         self._rebuild_caches()
         self._next_refresh_time = self.get_next_refresh_time()
 
-    def _initialize_hue_bridge(self):
-        super()._initialize_hue_bridge()
+    async def _initialize_hue_bridge(self):
+        await super()._initialize_hue_bridge()
 
         self._bridge.subscribe(self._on_state_changed)
 
@@ -103,8 +103,8 @@ class HueConnector(HueConnectorBase):
             self._on_state_changed(EventType.RESOURCE_UPDATED, hue_light)
 
         for hue_group in self._bridge.groups:
-            device = self._devices.get(hue_group.id)
-            if device:
+            thing = self._things.get(hue_group.id)
+            if thing:
                 if isinstance(hue_group, Room):  # Zone is inherited from Room
                     self._cached_grouped_light_ids_to_groups[hue_group.grouped_light] = hue_group.id
 
@@ -112,16 +112,16 @@ class HueConnector(HueConnectorBase):
                     self._cached_group_children[hue_group.id] = hue_children_ids
                 else:
                     _logger.warning("Only 'Rooms/Zones' are supported as groups. '%s' is of type '%s'. It's ignored!", type(hue_group))
-                    del self._devices[hue_group.id]
+                    del self._things[hue_group.id]
                     continue
 
         for hue_group in self._bridge.groups:
             self._on_state_changed(EventType.RESOURCE_UPDATED, hue_group)
 
         not_found_items = []
-        for device in self._devices.values():
-            if not self._cached_hue_items.get(device.hue_id):
-                not_found_items.append(device.name)
+        for thing in self._things.values():
+            if not self._cached_hue_items.get(thing.hue_id):
+                not_found_items.append(thing.name)
                 # TODO publish offline
         if not_found_items:
             _logger.warning("Unknown hue items found (%s)!", ", ".join(not_found_items))
@@ -142,24 +142,24 @@ class HueConnector(HueConnectorBase):
 
         # rooms (from grouped light) only
         room_item = None
-        device = self._devices.get(item.id)
-        if not device and isinstance(item, GroupedLight):
+        thing = self._things.get(item.id)
+        if not thing and isinstance(item, GroupedLight):
             room_item_id = self._cached_grouped_light_ids_to_groups.get(item.id)
             room_item = self._cached_hue_items.get(room_item_id)
             if room_item:
-                device = self._devices.get(room_item.id)
+                thing = self._things.get(room_item.id)
 
-        if not device:
+        if not thing:
             return
 
-        device_event = HueEventConverter.to_device_event(event_type, item, device.name)
+        thing_event = HueEventConverter.to_thing_event(event_type, item, thing.name)
         if room_item is not None:
-            device_event.id = device.hue_id
-            device_event.name = device.name
-            device_event.brightness = self._get_average_brightness_for_group(room_item)
+            thing_event.id = thing.hue_id
+            thing_event.name = thing.name
+            thing_event.brightness = self._get_average_brightness_for_group(room_item)
 
         # _logger.debug("_on_state_changed: %s, %s => %s", event_type, item, device_event)
-        device.process_state_change(device_event)
+        thing.process_state_change(thing_event)
 
     async def process_timer(self):
         """placeholder for reconnects or other organisational stuff"""
@@ -227,15 +227,15 @@ class HueConnector(HueConnectorBase):
         return hue_children_ids
 
     def fetch_commands(self) -> bool:
-        for device in self._devices.values():
+        for device in self._things.values():
             command = device.get_hue_command()
             if command:
-                self._device_commands.append((device, command))
-        return bool(self._device_commands)
+                self._thing_commands.append((device, command))
+        return bool(self._thing_commands)
 
     async def send_commands(self):
-        while self._device_commands:
-            device, command = self._device_commands.popleft()
+        while self._thing_commands:
+            device, command = self._thing_commands.popleft()
 
             hue_item = self._cached_hue_items.get(device.hue_id)
             if hue_item:
@@ -291,7 +291,7 @@ class HueConnector(HueConnectorBase):
         return command
 
     def _get_min_brightness(self, hue_item: Union[Light, Room]) -> float:
-        device = self._devices.get(hue_item.id)
+        device = self._things.get(hue_item.id)
         min_brightness = device.min_brightness if device else 1
 
         if isinstance(hue_item, Light):
