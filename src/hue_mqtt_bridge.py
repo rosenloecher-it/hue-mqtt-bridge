@@ -106,7 +106,7 @@ async def testable_main(
     run_mode = AppConfig.determine_run_mode(create_app_key, discover, explore, json_schema)
 
     things: List[Thing] = []
-    hue_bridge: Optional[HueConnectorBase] = None
+    hue_connector: Optional[HueConnectorBase] = None
     mqtt_client: Optional[MqttClient] = None
     mqtt_proxy: Optional[MqttProxy] = None
 
@@ -124,32 +124,32 @@ async def testable_main(
                 things = ThingFactory.create_things(app_config.get_things_config(), app_config.get_thing_defaults_config())
 
             if run_mode == RunMode.RUN_SERVICE:
-                hue_bridge = HueConnector(app_config.get_hue_bridge_config(), things)
+                hue_connector = HueConnector(app_config.get_hue_bridge_config(), things)
                 mqtt_client = MqttClient(app_config.get_mqtt_config())
                 mqtt_proxy = MqttProxy(mqtt_client, things)
             elif run_mode == RunMode.CREATE_APP_KEY:
-                hue_bridge = HueAppKey(app_config.get_hue_bridge_config(), things)
+                hue_connector = HueAppKey(app_config.get_hue_bridge_config(), things)
             elif run_mode == RunMode.EXPLORE:
-                hue_bridge = HueExplore(app_config.get_hue_bridge_config(), things)
+                hue_connector = HueExplore(app_config.get_hue_bridge_config(), things)
 
         if run_mode == RunMode.JSON_SCHEMA:
             AppConfig.print_config_file_json_schema()
         elif run_mode == RunMode.DISCOVER:
             await HueExplore.discover()
         elif run_mode == RunMode.EXPLORE:
-            await hue_bridge.run_tools()  # no loop
+            await hue_connector.run_tools()  # no loop
         elif run_mode == RunMode.CREATE_APP_KEY:
-            await hue_bridge.run_tools()  # no loop
+            await hue_connector.run_tools()  # no loop
         else:
-            runner = Runner(hue_bridge, mqtt_proxy)
+            runner = Runner(hue_connector, mqtt_proxy)
             await runner.run()
 
     finally:
         _logger.info("shutdown")
         if mqtt_proxy is not None:
             await mqtt_proxy.close()
-        if hue_bridge is not None:
-            await hue_bridge.close()
+        if hue_connector is not None:
+            await hue_connector.close()
         if mqtt_client is not None:
             mqtt_client.close()
 

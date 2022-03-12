@@ -20,7 +20,7 @@ class Runner:
 
     def __init__(self, hue_bridge: HueConnector, mqtt_proxy: MqttProxy):
 
-        self._hue_bridge = hue_bridge
+        self._hue_connector = hue_bridge
         self._mqtt_proxy = mqtt_proxy
 
         self._shutdown = False
@@ -44,7 +44,7 @@ class Runner:
         """endless loop"""
 
         await self._process_with_timeout(self._mqtt_proxy.connect(), "couldn't connect to MQTT")
-        await self._process_with_timeout(self._hue_bridge.connect(), "couldn't connect to Hue bridge")
+        await self._process_with_timeout(self._hue_connector.connect(), "couldn't connect to Hue bridge")
 
         try:
             while not self._shutdown:
@@ -65,12 +65,12 @@ class Runner:
                 if self._hue_task:
                     self._hue_task = self._check_or_finish_task(self._hue_task)
                 if not self._hue_task:
-                    if self._hue_bridge.fetch_commands():
-                        self._hue_task = self._create_task(self._hue_bridge.send_commands)
+                    if self._hue_connector.fetch_commands():
+                        self._hue_task = self._create_task(self._hue_connector.send_commands)
                     else:
                         if TimeUtils.now() > self._hue_next_timer_start:
                             self._hue_next_timer_start = self.get_next_timer_start()
-                            self._hue_task = self._create_task(self._hue_bridge.process_timer)
+                            self._hue_task = self._create_task(self._hue_connector.process_timer)
 
                 await asyncio.sleep(0.05)
 
