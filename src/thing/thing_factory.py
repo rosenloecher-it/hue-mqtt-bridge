@@ -19,17 +19,17 @@ class ThingFactory:
         config_errors: List[str] = []
 
         for name, thing_config in thing_configs.items():
-            cmd_topic = thing_config.get(ThingConfKey.RETAIN)
+            cmd_topic = thing_config.get(ThingConfKey.CMD_TOPIC)
             if cmd_topic is None and default_cmd_topic is not None:
                 cmd_topic = default_cmd_topic.replace(DEFAULT_TOPIC_KEY_PATTERN, name.lower())
-            state_topic = thing_config.get(ThingConfKey.RETAIN)
+            state_topic = thing_config.get(ThingConfKey.STATE_TOPIC)
             if state_topic is None and default_state_topic is not None:
                 state_topic = default_state_topic.replace(DEFAULT_TOPIC_KEY_PATTERN, name.lower())
             min_brightness = thing_config.get(ThingConfKey.MIN_BRIGHTNESS)
             if min_brightness is None and default_min_brightness is not None:
                 min_brightness = default_config.get(ThingDefaultConfKey.MIN_BRIGHTNESS)
 
-            last_will = thing_config.get(ThingConfKey.RETAIN)
+            last_will = thing_config.get(ThingConfKey.LAST_WILL)
             if last_will is None and default_last_will is not None:
                 last_will = default_last_will
 

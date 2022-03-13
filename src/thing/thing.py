@@ -35,6 +35,12 @@ class Thing:
 
         self._closed = False
 
+    def __str__(self):
+        return f"id: {self.hue_id}"
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.hue_id})"
+
     def close(self):
         if not self._closed:
             if self._last_will:

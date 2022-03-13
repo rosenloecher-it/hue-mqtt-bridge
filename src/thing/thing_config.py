@@ -16,6 +16,7 @@ class ThingConfKey:
 
     CMD_TOPIC = "cmd_topic"
     HUE_ID = "hue_id"
+    LAST_WILL = "last_will"
     MIN_BRIGHTNESS = "min_brightness"
     RETAIN = "retain"
     STATE_TOPIC = "state_topic"
@@ -64,6 +65,12 @@ THING_JSONSCHEMA = {
         ThingConfKey.HUE_ID: {"type": "string", "minLength": 1, "description": "Hue ID (UUID)"},
 
         ThingConfKey.RETAIN: {"type": "boolean"},
+
+        ThingDefaultConfKey.LAST_WILL: {
+            "type": "string",
+            "minLength": 1,
+            "description": "Default MQTT last will"
+        },
 
         ThingConfKey.MIN_BRIGHTNESS: {
             "type": "number",
