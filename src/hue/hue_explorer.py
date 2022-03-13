@@ -33,17 +33,17 @@ class HueExplorer(HueConnectorBase):
     @classmethod
     async def discover(cls):
         _logger.debug("discover")
-        cls.print("\nDiscovering Hue bridges...\n")
+        print("\nDiscovering Hue bridges...\n")
 
         bridges = await discover_nupnp()
         if bridges:
             for bridge in bridges:
-                support_info = "" if bridge.supports_v2 else "; NOT supported (no V2)!"
-                cls.print(f"Found bridge: IP '{bridge.host}'; ID '{bridge.id}'{support_info}")
+                support_info = "" if bridge.supports_v2 else " Bridge is NOT supported (not V2)!"
+                print(f"Found bridge: IP '{bridge.host}' (ID '{bridge.id})'{support_info}")
         else:
-            cls.print("No bridge found.")
+            print("No bridge found.")
 
-        cls.print()
+        print()
 
     def _cached_hue_items(self) -> HueCache:
         cache = HueCache()
@@ -82,15 +82,14 @@ class HueExplorer(HueConnectorBase):
         self.print(f"{offset}MODEL:       {self._bridge.config.model_id}")
         self.print(f"{offset}API VERSION: {self._bridge.config.software_version}")
 
-    @classmethod
-    def print_rooms(cls, hue_cache: HueCache):
-        cls.print()
-        cls.print("HUE ROOMS (WITH ASSIGNED LIGHTS)")
+    def print_rooms(self, hue_cache: HueCache):
+        self.print()
+        self.print("HUE ROOMS (WITH ASSIGNED LIGHTS)")
         for room in hue_cache.rooms.values():
-            offset = cls.get_offset(1)
-            cls.print(f"{offset}{room.type} {room.name} ({room.item.id})")
+            offset = self.get_offset(1)
+            self.print(f"{offset}{room.type} {room.name} ({room.item.id})")
 
-            offset = cls.get_offset(2)
+            offset = self.get_offset(2)
             lights = []
             for child_resource in room.item.children:
                 device_item = hue_cache.devices.get(child_resource.rid)
@@ -104,29 +103,28 @@ class HueExplorer(HueConnectorBase):
                         lights.append(light_item)
             lights = sorted(lights, key=lambda l: l.name.lower())
             for light in lights:
-                cls.print(f"{offset}LIGHT {light.name} ({light.item.id})")
+                self.print(f"{offset}LIGHT {light.name} ({light.item.id})")
 
-    @classmethod
-    def print_lights(cls, hue_cache: HueCache):
+    def print_lights(self, hue_cache: HueCache):
 
         def supports(value: bool) -> str:
             return "[" + ("X" if value else " ") + "]"
 
-        cls.print()
-        cls.print("LIGHTS")
+        self.print()
+        self.print("LIGHTS")
         for light in hue_cache.lights.values():
-            offset = cls.get_offset(1)
-            cls.print(f"{offset}LIGHT {light.name} ({light.item.id})")
+            offset = self.get_offset(1)
+            self.print(f"{offset}LIGHT {light.name} ({light.item.id})")
 
             dimming_info = ""
             if light.item.supports_dimming and light.item.dimming:
                 if light.item.dimming.min_dim_level and light.item.dimming.min_dim_level >= 1:
                     dimming_info = f" (MIN: {round(light.item.dimming.min_dim_level)}%)" if light.item.supports_dimming else ""
 
-            offset = cls.get_offset(2)
-            cls.print(f"{offset}COLOR TEMPERATURE: {supports(light.item.color_temperature)}")
-            cls.print(f"{offset}COLOR:             {supports(light.item.supports_color)}")
-            cls.print(f"{offset}DIMMING:           {supports(light.item.supports_dimming)}{dimming_info}")
+            offset = self.get_offset(2)
+            self.print(f"{offset}COLOR TEMPERATURE: {supports(light.item.color_temperature)}")
+            self.print(f"{offset}COLOR:             {supports(light.item.supports_color)}")
+            self.print(f"{offset}DIMMING:           {supports(light.item.supports_dimming)}{dimming_info}")
 
     def _print_config(self, hue_cache: HueCache):
         self.print()
@@ -161,6 +159,6 @@ class HueExplorer(HueConnectorBase):
         self._print_config(hue_cache)
         self.print()
 
-    @classmethod
-    def print(cls, text=""):
+    # noinspection PyMethodMayBeStatic
+    def print(self, text=""):
         print(text)
