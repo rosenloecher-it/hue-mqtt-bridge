@@ -39,7 +39,7 @@ class HueExplorer(HueConnectorBase):
         if bridges:
             for bridge in bridges:
                 support_info = "" if bridge.supports_v2 else " Bridge is NOT supported (not V2)!"
-                print(f"Found bridge: IP '{bridge.host}' (ID '{bridge.id})'{support_info}")
+                print(f"Found bridge: IP {bridge.host} (ID {bridge.id}){support_info}")
         else:
             print("No bridge found.")
 

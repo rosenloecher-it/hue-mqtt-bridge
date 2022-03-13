@@ -9,7 +9,7 @@ After=syslog.target network.target
 Type=simple
 ExecStart=/opt/hue-mqtt-bridge/hue-mqtt-bridge.sh --systemd-mode --config-file /opt/hue-mqtt-bridge/hue-mqtt-bridge.yaml
 Restart=always
-RestartSec=45
+RestartSec=120
 WorkingDirectory=/opt/hue-mqtt-bridge
 User=<your service user>
 

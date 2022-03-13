@@ -59,14 +59,19 @@ chmod 600 ./hue-mqtt-bridge.yaml
 # create an app key to access your Hue bridge. you will have to press the Hue button.
 ./hue-mqtt-bridge.sh --create-app-key
 
+# write ip and app token to config file 
+
 # explore your lights, groups and sensors. 'explore' will also compare your configuration with the Hue items.
-./hue-mqtt-bridge.sh --explore
+./hue-mqtt-bridge.sh --explore --config-file ./hue-mqtt-bridge.yaml
 
-# put all needed information with you configuration
-
-./hue-mqtt-bridge.sh --print-logs --config-file ./hue-mqtt-bridge.yaml
+# run
+./hue-mqtt-bridge.sh --print-log-console --config-file ./hue-mqtt-bridge.yaml
 # abort with ctrl+c
+```
 
+### Test
+
+```bash
 # testing - listing to configured topics
 mosquitto_sub -h $SERVER -d -t test/hue/<your-thing>/#
 
@@ -74,8 +79,21 @@ mosquitto_sub -h $SERVER -d -t test/hue/<your-thing>/#
 mosquitto_pub -h $SERVER -d -t test/hue/<your-thing>/cmd -m on
 mosquitto_pub -h $SERVER -d -t test/hue/<your-thing>/cmd -m off
 mosquitto_pub -h $SERVER -d -t test/hue/<your-thing>/cmd -m toggle
+
 # testing - dim your thing (%)
 mosquitto_pub -h $SERVER -d -t test/hue/<your-thing>/cmd -m 50
+```
+
+State messages looks like:
+```json
+{
+  "brightness": 57, 
+  "id": "6be8b5a9-8e1c-4565-ad13-e111b0c6c8ed", 
+  "name": "sleeping_light", 
+  "status": "on", 
+  "timestamp": "2022-03-13T21:38:29+01:00", 
+  "type": "light"
+}
 ```
 
 ## Register as systemd service
