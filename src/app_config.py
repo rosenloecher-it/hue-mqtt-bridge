@@ -96,7 +96,7 @@ class AppConfig:
 
     @classmethod
     def determine_run_mode(cls, create_app_key, discover, explore, json_schema) -> RunMode:
-        special_command_count = 1 if json_schema else 0 + 1 if discover else 0 + 1 if explore else 0 + 1 if create_app_key else 0
+        special_command_count = (1 if json_schema else 0) + (1 if discover else 0) + (1 if explore else 0) + (1 if create_app_key else 0)
         if special_command_count > 1:
             raise ConfigException("Use only one special mode command (create-user, discover, explore, json-schema)!")
 
