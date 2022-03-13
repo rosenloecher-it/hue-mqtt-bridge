@@ -56,6 +56,7 @@ class HueConnectorSimu(HueConnector):
 
     async def simu_command(self, device_key: str, command: str):
         thing = self._things[device_key]
+        # noinspection PyProtectedMember
         thing.process_mqtt_command(thing._cmd_topic, command)
 
         self.fetch_commands()

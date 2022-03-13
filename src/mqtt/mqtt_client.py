@@ -26,6 +26,7 @@ class MqttClient:
 
     TIME_WAIT_FOR_CONNECTION = 10  # seconds
 
+    # noinspection SpellCheckingInspection
     def __init__(self, config):
 
         self._host = None

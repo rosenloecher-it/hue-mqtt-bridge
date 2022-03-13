@@ -1,6 +1,6 @@
 # hue-mqtt-bridge
 
-Connect a Philips Hue bridge via MQTT. Get notified about state changes. Change the state of light and groupd viq MQTT commands. 
+Connect a Philips Hue bridge via MQTT. Get notified about state changes. Change the state of lights and groups via MQTT commands.
 
 Features:
 - Supposed to run as Linux service.

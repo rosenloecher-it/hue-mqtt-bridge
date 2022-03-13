@@ -35,6 +35,7 @@ class TestHueConnector(IsolatedAsyncioTestCase):
         )
 
     async def test_invalid_command(self):
+        # noinspection SpellCheckingInspection
         await self.connector.simu_command(HueBridgeSimu.ID_GROUP, "afasfdsafa")
         self.connector.set_light.assert_not_called()
         result_messages = self.connector.get_state_message()
@@ -73,7 +74,7 @@ class TestHueConnector(IsolatedAsyncioTestCase):
         result_messages = self.connector.get_state_message()
         self.assertCountEqual(result_messages, expected_messages_off)
 
-        # toogle on
+        # toggle on
         self.connector.reset_actions()
         await self.connector.simu_command(HueBridgeSimu.ID_GROUP, "toggle")
         self.connector.set_light.assert_has_calls(calls_on)
@@ -166,5 +167,5 @@ class TestHueConnector(IsolatedAsyncioTestCase):
         self.assertEqual(color_message, self.state_message(HueBridgeSimu.ID_COLOR1, "on", brightness=80))
 
         group_message = next(filter(lambda m: m.topic == "group/state", result_messages))
-        # missing group light update in simu, so state is still off, but it git triggered at all an calculated the brightness
+        # missing group light update in simu, so state is still off, but it gets triggered at all a calculated the brightness
         self.assertEqual(group_message.payload["brightness"], 40)

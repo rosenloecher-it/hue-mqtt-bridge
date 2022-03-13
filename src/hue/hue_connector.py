@@ -72,7 +72,7 @@ class HueConnectorBase:
 
     async def run_tools(self):
         """put main functionality here"""
-        # do nothing in base implemation!
+        # do nothing in base implementation!
 
 
 class HueConnector(HueConnectorBase):

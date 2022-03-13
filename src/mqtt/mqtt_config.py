@@ -1,5 +1,4 @@
-
-
+# noinspection SpellCheckingInspection
 class MqttConfKey:
     CLIENT_ID = "client_id"
     HOST = "host"

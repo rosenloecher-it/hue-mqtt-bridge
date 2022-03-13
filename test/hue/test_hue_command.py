@@ -3,6 +3,7 @@ import unittest
 from src.hue.hue_command import HueCommand, SwitchType
 
 
+# noinspection SpellCheckingInspection
 class TestHueCommand(unittest.TestCase):
 
     def test_parse(self):
