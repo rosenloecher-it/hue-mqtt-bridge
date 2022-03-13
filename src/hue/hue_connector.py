@@ -5,18 +5,22 @@ from typing import Optional, List, Dict, Set, Union, Deque
 
 import aiohue
 import attr
+import rx
 from aiohue import HueBridgeV2
 from aiohue.v2 import EventType
 from aiohue.v2.models.feature import OnFeature
 from aiohue.v2.models.grouped_light import GroupedLight
 from aiohue.v2.models.light import Light
 from aiohue.v2.models.room import Room
+from rx import operators as rx_ops
+from rx.core import Observer
+from rx.disposable import Disposable
 
 from src.app_config import ConfigException
-from src.thing.thing import Thing
 from src.hue.hue_command import HueCommand, HueCommandType, SwitchType
-from src.hue.hue_config import HueBridgeConfKey
+from src.hue.hue_config import HueBridgeConfKey, HueBridgeDefaults
 from src.hue.hue_event_converter import HueEventConverter
+from src.thing.thing import Thing
 from src.time_utils import TimeUtils
 
 _logger = logging.getLogger(__name__)
@@ -39,6 +43,7 @@ class HueConnectorBase:
 
         self._host = config[HueBridgeConfKey.HOST]
         self._app_key = config[HueBridgeConfKey.APP_KEY]
+        self._group_debounce_time = config.get(HueBridgeConfKey.GROUP_DEBOUNCE_TIME, HueBridgeDefaults.GROUP_DEBOUNCE_TIME)
         self._things: Dict[str, Thing] = {}
 
         self._bridge: Optional[HueBridgeV2] = None
@@ -77,9 +82,13 @@ class HueConnector(HueConnectorBase):
 
         self._thing_commands: Deque[(Thing, HueCommand)] = deque()
 
-        self._cached_group_children: Dict[str, List[str]] = {}
-        self._cached_grouped_light_ids_to_groups: Dict[str, str] = {}
-        self._cached_hue_items: Dict[str, Union[Light, GroupedLight]] = {}
+        self._group_children: Dict[str, List[str]] = {}
+        self._grouped_light_to_group: Dict[str, str] = {}
+        self._hue_items: Dict[str, Union[Light, GroupedLight]] = {}
+        self._light_to_room: Dict[str, str] = {}
+
+        self._room_observers: Dict[str, Optional[Observer]] = {}  # room id: observer
+        self._disposables: List[Disposable] = []
 
         self._next_refresh_time = self.get_next_refresh_time()
 
@@ -95,9 +104,12 @@ class HueConnector(HueConnectorBase):
         self._bridge.subscribe(self._on_state_changed)
 
     def _rebuild_caches(self):
-        self._cached_group_children = {}
-        self._cached_grouped_light_ids_to_groups = {}
-        self._cached_hue_items = {}
+        self._group_children = {}
+        self._grouped_light_to_group = {}
+        self._hue_items = {}
+        self._light_to_room: Dict[str, str] = {}
+
+        self._close_room_debounces()
 
         for hue_light in self._bridge.lights:
             self._on_state_changed(EventType.RESOURCE_UPDATED, hue_light)
@@ -105,54 +117,104 @@ class HueConnector(HueConnectorBase):
         for hue_group in self._bridge.groups:
             thing = self._things.get(hue_group.id)
             if thing:
-                if isinstance(hue_group, Room):  # Zone is inherited from Room
-                    self._cached_grouped_light_ids_to_groups[hue_group.grouped_light] = hue_group.id
-
-                    hue_children_ids = self._find_lights_for_group(hue_group)
-                    self._cached_group_children[hue_group.id] = hue_children_ids
-                else:
+                if not isinstance(hue_group, Room):  # Zone is inherited from Room
                     _logger.warning("Only 'Rooms/Zones' are supported as groups. '%s' is of type '%s'. It's ignored!", type(hue_group))
                     del self._things[hue_group.id]
                     continue
 
+                self._grouped_light_to_group[hue_group.grouped_light] = hue_group.id
+
+                hue_children_ids = self._find_lights_for_group(hue_group)
+                self._group_children[hue_group.id] = hue_children_ids
+
+                for hue_children_id in hue_children_ids:
+                    self._light_to_room[hue_children_id] = hue_group.id
+
+                self._register_room_debounce(hue_group)
+
+        # second loop to registered items when the registration has finished
         for hue_group in self._bridge.groups:
-            self._on_state_changed(EventType.RESOURCE_UPDATED, hue_group)
+            if isinstance(hue_group, GroupedLight):
+                self._on_state_changed(EventType.RESOURCE_UPDATED, hue_group)
+        for hue_group in self._bridge.groups:
+            if not isinstance(hue_group, GroupedLight):
+                self._on_state_changed(EventType.RESOURCE_UPDATED, hue_group)
 
         not_found_items = []
         for thing in self._things.values():
-            if not self._cached_hue_items.get(thing.hue_id):
+            if not self._hue_items.get(thing.hue_id):
                 not_found_items.append(thing.name)
                 # TODO publish offline
         if not_found_items:
             _logger.warning("Unknown hue items found (%s)!", ", ".join(not_found_items))
 
+    def _close_room_debounces(self):
+        for observable in self._room_observers.values():
+            observable.on_completed()
+        self._room_observers = {}
+
+        for disposable in self._disposables:
+            disposable.dispose()
+        self._disposables = []
+
+    def _register_room_debounce(self, hue_room: Room):
+        def creating_room_observer_callback(observer, _):
+            self._room_observers[hue_room.id] = observer
+
+        def feed_room_update(room_id: str):
+            hue_room_inner = self._hue_items.get(room_id)
+            self._on_state_changed(EventType.RESOURCE_UPDATED, hue_room_inner)
+
+        observable = rx.create(creating_room_observer_callback)
+
+        disposable = observable.pipe(
+            rx_ops.debounce(self._group_debounce_time)
+        ).subscribe(lambda room_id: feed_room_update(room_id))
+
+        self._disposables.append(disposable)
+
+    def _trigger_group_debounce(self, room_id):
+        observer = self._room_observers.get(room_id)
+        if observer:
+            observer.on_next(room_id)
+
     async def close(self):
         await super().close()
 
-        self._cached_hue_items = {}
+        self._close_room_debounces()
+        self._hue_items = {}
 
     def _on_state_changed(self, event_type: EventType, item):
         if not item and not item.id:
             return
 
-        self._cached_hue_items[item.id] = item
+        self._hue_items[item.id] = item
 
-        if isinstance(item, Room):
-            return
+        if isinstance(item, GroupedLight):
+            room_id = self._grouped_light_to_group.get(item.id)
+            if room_id:
+                self._trigger_group_debounce(room_id)
+            return  # event is prepared and sent when group gets through
 
-        # rooms (from grouped light) only
+        if isinstance(item, Light):
+            room_id = self._light_to_room.get(item.id)
+            if room_id:
+                self._trigger_group_debounce(room_id)
+
         room_item = None
+        event_item = item
         thing = self._things.get(item.id)
-        if not thing and isinstance(item, GroupedLight):
-            room_item_id = self._cached_grouped_light_ids_to_groups.get(item.id)
-            room_item = self._cached_hue_items.get(room_item_id)
-            if room_item:
-                thing = self._things.get(room_item.id)
-
         if not thing:
             return
 
-        thing_event = HueEventConverter.to_thing_event(event_type, item, thing.name)
+        if isinstance(item, Room):
+            room_item = item
+            event_item = self._hue_items.get(room_item.grouped_light)
+            if not event_item:
+                _logger.warning("cannot found group light for '%s'", thing.name)
+                return
+
+        thing_event = HueEventConverter.to_thing_event(event_type, event_item, thing.name)
         if room_item is not None:
             thing_event.id = thing.hue_id
             thing_event.name = thing.name
@@ -193,10 +255,10 @@ class HueConnector(HueConnectorBase):
         return average
 
     def _get_lights_for_group(self, hue_group: Room) -> List[Light]:
-        hue_children_ids = self._cached_group_children.get(hue_group.id)
+        hue_children_ids = self._group_children.get(hue_group.id)
         hue_children = []
         for hue_child_id in hue_children_ids:
-            hue_child = self._cached_hue_items.get(hue_child_id)
+            hue_child = self._hue_items.get(hue_child_id)
             if hue_child:
                 hue_children.append(hue_child)
 
@@ -237,7 +299,7 @@ class HueConnector(HueConnectorBase):
         while self._thing_commands:
             device, command = self._thing_commands.popleft()
 
-            hue_item = self._cached_hue_items.get(device.hue_id)
+            hue_item = self._hue_items.get(device.hue_id)
             if hue_item:
                 command = self._prepare_toggle_command(hue_item, command)
 
@@ -305,7 +367,7 @@ class HueConnector(HueConnectorBase):
         if command.type == HueCommandType.SWITCH and command.switch == SwitchType.TOGGLE:
             on_feature: OnFeature = None
             if isinstance(hue_item, Room):
-                grouped_light_item = self._cached_hue_items.get(hue_item.grouped_light)
+                grouped_light_item = self._hue_items.get(hue_item.grouped_light)
                 if grouped_light_item and hasattr(grouped_light_item, "on") and isinstance(grouped_light_item.on, OnFeature):
                     on_feature = grouped_light_item.on
             elif isinstance(hue_item, Light):
