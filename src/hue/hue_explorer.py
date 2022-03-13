@@ -28,22 +28,22 @@ class HueCache:
     lights: typing.OrderedDict[str, LightsController] = None
 
 
-class HueExplore(HueConnectorBase):
+class HueExplorer(HueConnectorBase):
 
     @classmethod
     async def discover(cls):
         _logger.debug("discover")
-        print("\nDiscovering Hue bridges...\n")
+        cls.print("\nDiscovering Hue bridges...\n")
 
         bridges = await discover_nupnp()
         if bridges:
             for bridge in bridges:
                 support_info = "" if bridge.supports_v2 else "; NOT supported (no V2)!"
-                print(f"Found bridge: IP '{bridge.host}'; ID '{bridge.id}'{support_info}")
+                cls.print(f"Found bridge: IP '{bridge.host}'; ID '{bridge.id}'{support_info}")
         else:
-            print("No bridge found.")
+            cls.print("No bridge found.")
 
-        print()
+        cls.print()
 
     def _cached_hue_items(self) -> HueCache:
         cache = HueCache()
@@ -73,22 +73,22 @@ class HueExplore(HueConnectorBase):
         return "    " * level
 
     def _print_bridge(self):
-        print()
-        print("HUE BRIDGE")
+        self.print()
+        self.print("HUE BRIDGE")
         offset = self.get_offset(1)
-        print(f"{offset}HOST:        {self._host}")
-        print(f"{offset}NAME:        {self._bridge.config.name}")
-        print(f"{offset}ID:          {self._bridge.bridge_id}")
-        print(f"{offset}MODEL:       {self._bridge.config.model_id}")
-        print(f"{offset}API VERSION: {self._bridge.config.software_version}")
+        self.print(f"{offset}HOST:        {self._host}")
+        self.print(f"{offset}NAME:        {self._bridge.config.name}")
+        self.print(f"{offset}ID:          {self._bridge.bridge_id}")
+        self.print(f"{offset}MODEL:       {self._bridge.config.model_id}")
+        self.print(f"{offset}API VERSION: {self._bridge.config.software_version}")
 
     @classmethod
     def print_rooms(cls, hue_cache: HueCache):
-        print()
-        print("HUE ROOMS (WITH ASSIGNED LIGHTS)")
+        cls.print()
+        cls.print("HUE ROOMS (WITH ASSIGNED LIGHTS)")
         for room in hue_cache.rooms.values():
             offset = cls.get_offset(1)
-            print(f"{offset}{room.type} {room.name} ({room.item.id})")
+            cls.print(f"{offset}{room.type} {room.name} ({room.item.id})")
 
             offset = cls.get_offset(2)
             lights = []
@@ -104,7 +104,7 @@ class HueExplore(HueConnectorBase):
                         lights.append(light_item)
             lights = sorted(lights, key=lambda l: l.name.lower())
             for light in lights:
-                print(f"{offset}LIGHT {light.name} ({light.item.id})")
+                cls.print(f"{offset}LIGHT {light.name} ({light.item.id})")
 
     @classmethod
     def print_lights(cls, hue_cache: HueCache):
@@ -112,11 +112,11 @@ class HueExplore(HueConnectorBase):
         def supports(value: bool) -> str:
             return "[" + ("X" if value else " ") + "]"
 
-        print()
-        print("LIGHTS")
+        cls.print()
+        cls.print("LIGHTS")
         for light in hue_cache.lights.values():
             offset = cls.get_offset(1)
-            print(f"{offset}LIGHT {light.name} ({light.item.id})")
+            cls.print(f"{offset}LIGHT {light.name} ({light.item.id})")
 
             dimming_info = ""
             if light.item.supports_dimming and light.item.dimming:
@@ -124,30 +124,30 @@ class HueExplore(HueConnectorBase):
                     dimming_info = f" (MIN: {round(light.item.dimming.min_dim_level)}%)" if light.item.supports_dimming else ""
 
             offset = cls.get_offset(2)
-            print(f"{offset}COLOR TEMPERATURE: {supports(light.item.color_temperature)}")
-            print(f"{offset}COLOR:             {supports(light.item.supports_color)}")
-            print(f"{offset}DIMMING:           {supports(light.item.supports_dimming)}{dimming_info}")
+            cls.print(f"{offset}COLOR TEMPERATURE: {supports(light.item.color_temperature)}")
+            cls.print(f"{offset}COLOR:             {supports(light.item.supports_color)}")
+            cls.print(f"{offset}DIMMING:           {supports(light.item.supports_dimming)}{dimming_info}")
 
     def _print_config(self, hue_cache: HueCache):
-        print()
-        print("CONFIGURED THINGS")
+        self.print()
+        self.print("CONFIGURED THINGS")
 
         things = sorted(self._things.values(), key=lambda d: d.name.lower())
 
         for thing in things:
             offset = self.get_offset(1)
-            print(f"{offset}CONFIGURED THING: {thing.name}")
+            self.print(f"{offset}CONFIGURED THING: {thing.name}")
 
             offset = self.get_offset(2)
             hue_item = hue_cache.rooms.get(thing.hue_id) or hue_cache.lights.get(thing.hue_id)
             if hue_item:
-                print(f"{offset}HUE ITEM:      {hue_item.type} {hue_item.name} ({hue_item.item.id})")
+                self.print(f"{offset}HUE ITEM:      {hue_item.type} {hue_item.name} ({hue_item.item.id})")
             else:
-                print(f"{offset}HUE ITEM:      NOT FOUND !?")
-            print(f"{offset}COMMAND TOPIC: {thing.cmd_topic}")
-            print(f"{offset}STATE TOPIC:   {thing.state_topic}")
-            print(f"{offset}RETAIN:        [" + ("X" if thing.retain else " ") + "]")
-            print(f"{offset}LAST WILL:     {thing.last_will}")
+                self.print(f"{offset}HUE ITEM:      NOT FOUND !?")
+            self.print(f"{offset}COMMAND TOPIC: {thing.cmd_topic}")
+            self.print(f"{offset}STATE TOPIC:   {thing.state_topic}")
+            self.print(f"{offset}RETAIN:        [" + ("X" if thing.retain else " ") + "]")
+            self.print(f"{offset}LAST WILL:     {thing.last_will}")
 
     async def run_tools(self):
         if not self._bridge:
@@ -159,4 +159,8 @@ class HueExplore(HueConnectorBase):
         self.print_lights(hue_cache)
         self.print_rooms(hue_cache)
         self._print_config(hue_cache)
-        print()
+        self.print()
+
+    @classmethod
+    def print(cls, text=""):
+        print(text)

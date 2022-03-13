@@ -13,7 +13,7 @@ from src.thing.thing import Thing
 from src.thing.thing_factory import ThingFactory
 from src.hue.hue_app_key import HueAppKey
 from src.hue.hue_connector import HueConnector, HueConnectorBase
-from src.hue.hue_explore import HueExplore
+from src.hue.hue_explorer import HueExplorer
 from src.mqtt.mqtt_client import MqttClient
 from src.mqtt.mqtt_proxy import MqttProxy
 from src.runner import Runner
@@ -130,12 +130,12 @@ async def testable_main(
             elif run_mode == RunMode.CREATE_APP_KEY:
                 hue_connector = HueAppKey(app_config.get_hue_bridge_config(), things)
             elif run_mode == RunMode.EXPLORE:
-                hue_connector = HueExplore(app_config.get_hue_bridge_config(), things)
+                hue_connector = HueExplorer(app_config.get_hue_bridge_config(), things)
 
         if run_mode == RunMode.JSON_SCHEMA:
             AppConfig.print_config_file_json_schema()
         elif run_mode == RunMode.DISCOVER:
-            await HueExplore.discover()
+            await HueExplorer.discover()
         elif run_mode == RunMode.EXPLORE:
             await hue_connector.run_tools()  # no loop
         elif run_mode == RunMode.CREATE_APP_KEY:
