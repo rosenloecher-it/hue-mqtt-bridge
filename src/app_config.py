@@ -113,6 +113,8 @@ class AppConfig:
 
     @classmethod
     def check_config_file_access(cls, config_file):
+        if not config_file:
+            raise ConfigException("Missing config file!")
         if not os.path.isfile(config_file):
             raise FileNotFoundError('config file ({}) does not exist!'.format(config_file))
 
