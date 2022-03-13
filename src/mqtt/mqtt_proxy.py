@@ -32,6 +32,7 @@ class MqttProxy:
                 listeners.append(thing)
 
     async def close(self):
+        self.fetch_state_changes()
         await self.publish_state_messages()  # contains the last wills
         self._mqtt_client = None  # used as shutdown marker
 
