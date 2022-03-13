@@ -153,3 +153,18 @@ class TestHueConnector(IsolatedAsyncioTestCase):
         self.connector.set_light.assert_has_calls(calls_off)
         result_messages = self.connector.get_state_message()
         self.assertEqual(result_messages, expected_messages_off)
+
+    async def test_single_dim_triggers_group_message(self):
+        calls = [call(id=HueBridgeSimu.ID_COLOR1, on=True, brightness=80)]
+
+        await self.connector.simu_command(HueBridgeSimu.ID_COLOR1, "80")
+        self.connector.set_light.assert_has_calls(calls)
+        result_messages = self.connector.get_state_message()
+        self.assertEqual(len(result_messages), 2)
+
+        color_message = next(filter(lambda m: m.topic == "color1/state", result_messages))
+        self.assertEqual(color_message, self.state_message(HueBridgeSimu.ID_COLOR1, "on", brightness=80))
+
+        group_message = next(filter(lambda m: m.topic == "group/state", result_messages))
+        # missing group light update in simu, so state is still off, but it git triggered at all an calculated the brightness
+        self.assertEqual(group_message.payload["brightness"], 40)
