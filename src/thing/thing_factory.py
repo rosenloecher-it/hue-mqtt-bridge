@@ -1,5 +1,6 @@
 from typing import List, Dict
 
+from src.app_config import ConfigException
 from src.thing.thing import Thing
 from src.thing.thing_config import ThingConfKey, ThingDefaultConfKey, DEFAULT_TOPIC_KEY_PATTERN
 
@@ -16,7 +17,6 @@ class ThingFactory:
         default_min_brightness = default_config.get(ThingDefaultConfKey.MIN_BRIGHTNESS)
 
         things: List[Thing] = []
-        config_errors: List[str] = []
 
         for name, thing_config in thing_configs.items():
             cmd_topic = thing_config.get(ThingConfKey.CMD_TOPIC)
@@ -39,9 +39,8 @@ class ThingFactory:
 
             hue_id = thing_config.get(ThingConfKey.HUE_ID)
 
-            if not hue_id or not name or not cmd_topic or not state_topic:
-                config_errors.append(f"thing '{name}': invalid config")
-                continue
+            if not cmd_topic and not state_topic:
+                raise ConfigException(f"Thing '{name}' has no MQTT topics!")
 
             thing = Thing(
                 hue_id=hue_id, name=name, cmd_topic=cmd_topic, state_topic=state_topic, last_will=last_will, retain=bool(retain),
