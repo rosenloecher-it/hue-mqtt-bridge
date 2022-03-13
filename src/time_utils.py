@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 
 from tzlocal import get_localzone
@@ -12,3 +13,8 @@ class TimeUtils:
         if no_ms:
             now = now.replace(microsecond=0)
         return now
+
+    @classmethod
+    async def sleep(cls, seconds: float) -> int:
+        await asyncio.sleep(seconds)
+        return seconds

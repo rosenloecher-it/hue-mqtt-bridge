@@ -65,9 +65,9 @@ class RoomSimu(ThingSimu):
 
 class HueBridgeSimu:
     """
-    Creates a "HueBridgeV2" bridge with devices, lights, rooms, "grouped lights"...
+    Creates a dummy "HueBridgeV2" with devices, lights, rooms, "grouped lights"...
 
-    Structure:
+    Device structure:
     - switch
     - dimmer
     - group
@@ -95,15 +95,12 @@ class HueBridgeSimu:
 
         configurable_things = cls.configurable_things()
         for configurable_thing in configurable_things:
-
             if isinstance(configurable_thing, LightSimu):
                 hue_lights.append(configurable_thing.hue_item)
                 hue_devices.append(configurable_thing.hue_device)
-
             elif isinstance(configurable_thing, RoomSimu):
                 hue_groups.append(configurable_thing.hue_item)
                 hue_groups.append(configurable_thing.hue_grouped_light)
-
             else:
                 raise ValueError("Wrong type")
 
@@ -252,11 +249,3 @@ class HueBridgeSimu:
         hue_light.dimming = None
 
         return hue_light
-
-    # @classmethod
-    # def set_ligth(cls, light: Light, on=Optional[False], brightness=Optional[float]):
-    #     pass
-    #
-    # @classmethod
-    # def set_room(cls, light: Light, on=Optional[False], brightness=Optional[float]):
-    #     pass
