@@ -382,4 +382,4 @@ class HueConnector(HueConnectorBase):
 
     @classmethod
     def get_next_refresh_time(cls) -> datetime.datetime:
-        return TimeUtils.now() + datetime.timedelta(seconds=600)
+        return TimeUtils.now() + datetime.timedelta(seconds=1800)
