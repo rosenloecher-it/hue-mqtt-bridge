@@ -163,7 +163,10 @@ class HueConnector(HueConnectorBase):
 
         def feed_room_update(room_id: str):
             hue_room_inner = self._hue_items.get(room_id)
-            self._on_state_changed(EventType.RESOURCE_UPDATED, hue_room_inner)
+            if hue_room_inner:
+                self._on_state_changed(EventType.RESOURCE_UPDATED, hue_room_inner)
+            else:
+                _logger.debug('No "debounced room update"" possible: room id (%s) not found! Just refreshing...?', room_id)
 
         observable = rx.create(creating_room_observer_callback)
 
