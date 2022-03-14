@@ -3,23 +3,27 @@ DEFAULT_TOPIC_KEY_PATTERN = "{THING_KEY}"
 _thing_key_info = f"May contain '{DEFAULT_TOPIC_KEY_PATTERN}', which will be replaced with the thing key."
 
 
-class ThingDefaultConfKey:
+class ThingDefaults:
+    STATE_DEBOUNCE_TIME = 300  # milliseconds
 
+
+class ThingDefaultConfKey:
     CMD_TOPIC = "cmd_topic"
     LAST_WILL = "last_will"
     MIN_BRIGHTNESS = "min_brightness"
     RETAIN = "retain"
+    STATE_DEBOUNCE_TIME = "state_debounce_time"
     STATE_TOPIC = "state_topic"
 
 
 class ThingConfKey:
-
     CMD_TOPIC = "cmd_topic"
     HUE_ID = "hue_id"
     LAST_WILL = "last_will"
     MIN_BRIGHTNESS = "min_brightness"
     RETAIN = "retain"
     STATE_TOPIC = "state_topic"
+    STATE_DEBOUNCE_TIME = "state_debounce_time"
     TYPE = "type"
 
 
@@ -50,6 +54,13 @@ THING_DEFAULTS_JSONSCHEMA = {
             "maximum": 100.0,
             "description": "Default min brightness (%). Lower values lads to switching off."
         },
+        ThingDefaultConfKey.STATE_DEBOUNCE_TIME: {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5000,
+            "description": "State messages are hold back for this time. The last state message gets sent. Default is "
+                           f"{ThingDefaults.STATE_DEBOUNCE_TIME} milliseconds."
+        }
     },
 }
 
@@ -78,7 +89,13 @@ THING_JSONSCHEMA = {
             "maximum": 100.0,
             "description": "Default min brightness (%). Lower values lads to switching off."
         },
-        # DeviceConfKey.TYPE: {"type": "string", "enum": DEVICE_TYPES, "description": "Device type"},
+        ThingConfKey.STATE_DEBOUNCE_TIME: {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5000,
+            "description": "State messages are hold back for this time. The last state message gets sent. Default is "
+                           f"{ThingDefaults.STATE_DEBOUNCE_TIME} milliseconds."
+        }
     },
 }
 

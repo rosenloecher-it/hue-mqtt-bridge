@@ -2,7 +2,7 @@ from typing import List, Dict
 
 from src.app_config import ConfigException
 from src.thing.thing import Thing
-from src.thing.thing_config import ThingConfKey, ThingDefaultConfKey, DEFAULT_TOPIC_KEY_PATTERN
+from src.thing.thing_config import ThingConfKey, ThingDefaultConfKey, DEFAULT_TOPIC_KEY_PATTERN, ThingDefaults
 
 
 class ThingFactory:
@@ -15,6 +15,7 @@ class ThingFactory:
         default_retain = default_config.get(ThingDefaultConfKey.RETAIN)
         default_last_will = default_config.get(ThingDefaultConfKey.LAST_WILL)
         default_min_brightness = default_config.get(ThingDefaultConfKey.MIN_BRIGHTNESS)
+        default_state_debounce_time = default_config.get(ThingDefaultConfKey.STATE_DEBOUNCE_TIME, ThingDefaults.STATE_DEBOUNCE_TIME)
 
         things: List[Thing] = []
 
@@ -22,12 +23,19 @@ class ThingFactory:
             cmd_topic = thing_config.get(ThingConfKey.CMD_TOPIC)
             if cmd_topic is None and default_cmd_topic is not None:
                 cmd_topic = default_cmd_topic.replace(DEFAULT_TOPIC_KEY_PATTERN, name.lower())
+
             state_topic = thing_config.get(ThingConfKey.STATE_TOPIC)
             if state_topic is None and default_state_topic is not None:
                 state_topic = default_state_topic.replace(DEFAULT_TOPIC_KEY_PATTERN, name.lower())
+
             min_brightness = thing_config.get(ThingConfKey.MIN_BRIGHTNESS)
             if min_brightness is None and default_min_brightness is not None:
-                min_brightness = default_config.get(ThingDefaultConfKey.MIN_BRIGHTNESS)
+                min_brightness = default_min_brightness
+
+            state_debounce_time = thing_config.get(ThingConfKey.STATE_DEBOUNCE_TIME)
+            if state_debounce_time is None and default_state_debounce_time is not None:
+                state_debounce_time = default_state_debounce_time
+            state_debounce_time = state_debounce_time / 1000  # ms => seconds
 
             last_will = thing_config.get(ThingConfKey.LAST_WILL)
             if last_will is None and default_last_will is not None:
@@ -44,7 +52,7 @@ class ThingFactory:
 
             thing = Thing(
                 hue_id=hue_id, name=name, cmd_topic=cmd_topic, state_topic=state_topic, last_will=last_will, retain=bool(retain),
-                min_brightness=min_brightness
+                min_brightness=min_brightness, state_debounce_time=state_debounce_time
             )
             things.append(thing)
 

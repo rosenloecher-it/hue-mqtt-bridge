@@ -4,6 +4,7 @@ from typing import Dict, List, Union, Optional
 
 import attr
 
+from src.thing.thing_config import ThingDefaults
 from src.thing.thing_event import ThingEvent
 from src.hue.hue_command import HueCommand
 from src.time_utils import TimeUtils
@@ -19,7 +20,8 @@ class StateMessage:
 
 class Thing:
 
-    def __init__(self, hue_id: str, name: str, cmd_topic: str, state_topic: str, last_will: str, retain: bool, min_brightness: float):
+    def __init__(self, hue_id: str, name: str, cmd_topic: str, state_topic: str, last_will: str, retain: bool,
+                 min_brightness: float, state_debounce_time: float = ThingDefaults.STATE_DEBOUNCE_TIME):
         self._name = name
         self._hue_id = hue_id
         self._cmd_topic = cmd_topic
@@ -27,6 +29,7 @@ class Thing:
         self._last_will = last_will
         self._retain = retain
         self._min_brightness = min_brightness
+        self._state_debounce_time = state_debounce_time
 
         self.__logger = None  # type: Optional[Logger]
 
@@ -80,6 +83,10 @@ class Thing:
     @property
     def min_brightness(self) -> float:
         return self._min_brightness
+
+    @property
+    def state_debounce_time(self) -> float:
+        return self._state_debounce_time
 
     @property
     def _logger(self):
