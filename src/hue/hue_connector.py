@@ -185,7 +185,7 @@ class HueConnector(HueConnectorBase):
         self._hue_items = {}
 
     def _on_state_changed(self, event_type: EventType, item):
-        if not item and not item.id:
+        if not item or not item.id:
             return
 
         self._hue_items[item.id] = item
