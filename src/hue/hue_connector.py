@@ -152,8 +152,8 @@ class HueConnector(HueConnectorBase):
         not_found_items = []
         for thing in self._things.values():
             if not self._hue_items.get(thing.hue_id):
-                not_found_items.append(thing.name)
-                # TODO publish offline
+                not_found_items.append(f"hue id: {thing.hue_id}, thing: {thing.name}")
+                thing.close()  # sends last will if configured
             else:
                 self._register_state_debounce(thing)
 
