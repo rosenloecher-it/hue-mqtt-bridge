@@ -22,9 +22,9 @@ HUE_BRIDGE_JSONSCHEMA = {
         HueBridgeConfKey.GROUP_DEBOUNCE_TIME: {
             "type": "number",
             "minimum": 1,
-            "maximum": 1000,
+            "maximum": 5000,
             "description": "Hue child lights trigger a group message after this time, Default is "
-                           f"{HueBridgeDefaults.GROUP_DEBOUNCE_TIME} milliseconds"
-        }
+                           f"{HueBridgeDefaults.GROUP_DEBOUNCE_TIME} milliseconds."
+        },
     },
 }

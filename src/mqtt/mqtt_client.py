@@ -153,7 +153,6 @@ class MqttClient:
     def _on_connect(self, _mqtt_client, _userdata, _flags, rc):
         """MQTT callback is called when client connects to MQTT server."""
         if rc == 0:
-            last_disconnected_error_info = None
             with self._lock:
                 self._is_connected = True
                 last_disconnected_error_info = self._disconnected_error_info
