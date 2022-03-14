@@ -43,7 +43,7 @@ class HueConnectorBase:
 
         self._host = config[HueBridgeConfKey.HOST]
         self._app_key = config[HueBridgeConfKey.APP_KEY]
-        self._group_debounce_time = config.get(HueBridgeConfKey.GROUP_DEBOUNCE_TIME, HueBridgeDefaults.GROUP_DEBOUNCE_TIME)
+        self._group_debounce_time = config.get(HueBridgeConfKey.GROUP_DEBOUNCE_TIME, HueBridgeDefaults.GROUP_DEBOUNCE_TIME) / 1000
         self._things: Dict[str, Thing] = {}
 
         self._bridge: Optional[HueBridgeV2] = None
@@ -85,7 +85,7 @@ class HueConnector(HueConnectorBase):
         self._group_children: Dict[str, List[str]] = {}
         self._grouped_light_to_group: Dict[str, str] = {}
         self._hue_items: Dict[str, Union[Light, GroupedLight]] = {}
-        self._light_to_room: Dict[str, str] = {}
+        self._light_to_group: Dict[str, str] = {}
 
         self._room_observers: Dict[str, Optional[Observer]] = {}  # room id: observer
         self._disposables: List[Disposable] = []
@@ -98,6 +98,12 @@ class HueConnector(HueConnectorBase):
         self._rebuild_caches()
         self._next_refresh_time = self.get_next_refresh_time()
 
+    async def close(self):
+        await super().close()
+
+        self._close_group_debounces()
+        self._hue_items = {}
+
     async def _initialize_hue_bridge(self):
         await super()._initialize_hue_bridge()
 
@@ -107,9 +113,9 @@ class HueConnector(HueConnectorBase):
         self._group_children = {}
         self._grouped_light_to_group = {}
         self._hue_items = {}
-        self._light_to_room: Dict[str, str] = {}
+        self._light_to_group: Dict[str, str] = {}
 
-        self._close_room_debounces()
+        self._close_group_debounces()
 
         for hue_light in self._bridge.lights:
             self._on_state_changed(EventType.RESOURCE_UPDATED, hue_light)
@@ -128,9 +134,9 @@ class HueConnector(HueConnectorBase):
                 self._group_children[hue_group.id] = hue_children_ids
 
                 for hue_children_id in hue_children_ids:
-                    self._light_to_room[hue_children_id] = hue_group.id
+                    self._light_to_group[hue_children_id] = hue_group.id
 
-                self._register_room_debounce(hue_group)
+                self._register_group_debounce(hue_group)
 
         # second loop to registered items when the registration has finished
         for hue_group in self._bridge.groups:
@@ -148,7 +154,7 @@ class HueConnector(HueConnectorBase):
         if not_found_items:
             _logger.warning("Unknown hue items found (%s)!", ", ".join(not_found_items))
 
-    def _close_room_debounces(self):
+    def _close_group_debounces(self):
         for observable in self._room_observers.values():
             observable.on_completed()
         self._room_observers = {}
@@ -157,7 +163,7 @@ class HueConnector(HueConnectorBase):
             disposable.dispose()
         self._disposables = []
 
-    def _register_room_debounce(self, hue_room: Room):
+    def _register_group_debounce(self, hue_room: Room):
         def creating_room_observer_callback(observer, _):
             self._room_observers[hue_room.id] = observer
 
@@ -180,50 +186,49 @@ class HueConnector(HueConnectorBase):
         observer = self._room_observers.get(room_id)
         if observer:
             observer.on_next(room_id)
-
-    async def close(self):
-        await super().close()
-
-        self._close_room_debounces()
-        self._hue_items = {}
+        else:
+            _logger.warning("'group debounce' failed, because group (%s) was not found!", room_id)
 
     def _on_state_changed(self, event_type: EventType, item):
         if not item or not item.id:
+            _logger.debug("skipped 'on_state_changed' because an invalid item.")
             return
+
+        # _logger.debug("_on_state_changed - in: %s, %s", event_type, item)
 
         self._hue_items[item.id] = item
 
         if isinstance(item, GroupedLight):
-            room_id = self._grouped_light_to_group.get(item.id)
-            if room_id:
-                self._trigger_group_debounce(room_id)
+            group_id = self._grouped_light_to_group.get(item.id)
+            if group_id:
+                self._trigger_group_debounce(group_id)
             return  # event is prepared and sent when group gets through
 
         if isinstance(item, Light):
-            room_id = self._light_to_room.get(item.id)
-            if room_id:
-                self._trigger_group_debounce(room_id)
+            group_id = self._light_to_group.get(item.id)
+            if group_id:
+                self._trigger_group_debounce(group_id)
 
-        room_item = None
+        group_item = None
         event_item = item
         thing = self._things.get(item.id)
         if not thing:
             return
 
         if isinstance(item, Room):
-            room_item = item
-            event_item = self._hue_items.get(room_item.grouped_light)
+            group_item = item
+            event_item = self._hue_items.get(group_item.grouped_light)
             if not event_item:
                 _logger.warning("cannot found group light for '%s'", thing.name)
                 return
 
         thing_event = HueEventConverter.to_thing_event(event_type, event_item, thing.name)
-        if room_item is not None:
+        if group_item is not None:
             thing_event.id = thing.hue_id
             thing_event.name = thing.name
-            thing_event.brightness = self._get_average_brightness_for_group(room_item)
+            thing_event.brightness = self._get_average_brightness_for_group(group_item)
 
-        # _logger.debug("_on_state_changed: %s, %s => %s", event_type, item, device_event)
+        # _logger.debug("_on_state_changed: %s, %s => %s", event_type, item, thing_event)
         thing.process_state_change(thing_event)
 
     async def process_timer(self):

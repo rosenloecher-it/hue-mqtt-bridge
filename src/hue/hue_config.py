@@ -2,7 +2,7 @@
 
 class HueBridgeDefaults:
 
-    GROUP_DEBOUNCE_TIME = 300
+    GROUP_DEBOUNCE_TIME = 300  # milliseconds
 
 
 class HueBridgeConfKey:
