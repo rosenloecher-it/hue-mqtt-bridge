@@ -21,6 +21,7 @@ from src.hue.hue_command import HueCommand, HueCommandType, SwitchType
 from src.hue.hue_config import HueBridgeConfKey, HueBridgeDefaults
 from src.hue.hue_event_converter import HueEventConverter
 from src.thing.thing import Thing
+from src.thing.thing_event import ThingEvent
 from src.time_utils import TimeUtils
 
 _logger = logging.getLogger(__name__)
@@ -43,7 +44,6 @@ class HueConnectorBase:
 
         self._host = config[HueBridgeConfKey.HOST]
         self._app_key = config[HueBridgeConfKey.APP_KEY]
-        self._group_debounce_time = config.get(HueBridgeConfKey.GROUP_DEBOUNCE_TIME, HueBridgeDefaults.GROUP_DEBOUNCE_TIME) / 1000
         self._things: Dict[str, Thing] = {}
 
         self._bridge: Optional[HueBridgeV2] = None
@@ -80,6 +80,8 @@ class HueConnector(HueConnectorBase):
     def __init__(self, config, things: List[Thing]):
         super().__init__(config, things)
 
+        self._group_debounce_time = config.get(HueBridgeConfKey.GROUP_DEBOUNCE_TIME, HueBridgeDefaults.GROUP_DEBOUNCE_TIME) / 1000
+
         self._thing_commands: Deque[(Thing, HueCommand)] = deque()
 
         self._group_children: Dict[str, List[str]] = {}
@@ -88,6 +90,7 @@ class HueConnector(HueConnectorBase):
         self._light_to_group: Dict[str, str] = {}
 
         self._group_observers: Dict[str, Optional[Observer]] = {}  # group id: observer
+        self._state_observers: Dict[str, Optional[Observer]] = {}  # thing id: observer
         self._disposables: List[Disposable] = []
 
         self._next_refresh_time = self.get_next_refresh_time()
@@ -101,7 +104,7 @@ class HueConnector(HueConnectorBase):
     async def close(self):
         await super().close()
 
-        self._close_group_debounces()
+        self._close_debounces()
         self._hue_items = {}
 
     async def _initialize_hue_bridge(self):
@@ -115,7 +118,7 @@ class HueConnector(HueConnectorBase):
         self._hue_items = {}
         self._light_to_group: Dict[str, str] = {}
 
-        self._close_group_debounces()
+        self._close_debounces()
 
         for hue_light in self._bridge.lights:
             self._on_state_changed(EventType.RESOURCE_UPDATED, hue_light)
@@ -151,23 +154,56 @@ class HueConnector(HueConnectorBase):
             if not self._hue_items.get(thing.hue_id):
                 not_found_items.append(thing.name)
                 # TODO publish offline
+            else:
+                self._register_state_debounce(thing)
+
         if not_found_items:
             _logger.warning("Unknown hue items found (%s)!", ", ".join(not_found_items))
 
-    def _close_group_debounces(self):
+    def _close_debounces(self):
         for observable in self._group_observers.values():
             observable.on_completed()
         self._group_observers = {}
+
+        for observable in self._state_observers.values():
+            observable.on_completed()
+        self._state_observers = {}
 
         for disposable in self._disposables:
             disposable.dispose()
         self._disposables = []
 
-    def _register_group_debounce(self, hue_group: Room):
-        def creating_observer_callback(observer, _):
-            self._group_observers[hue_group.id] = observer
+    def _register_state_debounce(self, thing: Thing):
+        thing_id = thing.hue_id
 
-        def feed_group_update(group_id_inner: str):
+        def creating_observer_callback(observer, _):
+            self._state_observers[thing_id] = observer
+
+        def feed_state_update(thing_event: ThingEvent):
+            thing_inner = self._things.get(thing_id)
+            if thing_inner:
+                thing_inner.process_state_change(thing_event)
+            else:
+                _logger.debug('No "debounced state update"" possible: thing id (%s) not found!', thing_id)
+            pass
+
+        observable = rx.create(creating_observer_callback)
+
+        disposable = observable.pipe(
+            rx_ops.debounce(thing.state_debounce_time)
+        ).subscribe(lambda thing_event: feed_state_update(thing_event))
+
+        self._disposables.append(disposable)
+
+    def _register_group_debounce(self, hue_group: Room):
+        group_id = hue_group.id
+
+        def creating_observer_callback(observer, _):
+            group_id_inner = group_id
+            self._group_observers[group_id_inner] = observer
+
+        def feed_group_update():
+            group_id_inner = group_id
             hue_group_inner = self._hue_items.get(group_id_inner)
             if hue_group_inner:
                 self._on_state_changed(EventType.RESOURCE_UPDATED, hue_group_inner)
@@ -178,7 +214,7 @@ class HueConnector(HueConnectorBase):
 
         disposable = observable.pipe(
             rx_ops.debounce(self._group_debounce_time)
-        ).subscribe(lambda group_id: feed_group_update(group_id))
+        ).subscribe(lambda _: feed_group_update())
 
         self._disposables.append(disposable)
 
@@ -229,7 +265,9 @@ class HueConnector(HueConnectorBase):
             thing_event.brightness = self._get_average_brightness_for_group(group_item)
 
         # _logger.debug("_on_state_changed: %s, %s => %s", event_type, item, thing_event)
-        thing.process_state_change(thing_event)
+        observer = self._state_observers.get(thing.hue_id)
+        if observer:
+            observer.on_next(thing_event)
 
     async def process_timer(self):
         """placeholder for reconnects or other organisational stuff"""

@@ -23,10 +23,12 @@ class HueConnectorSimu(HueConnector):
             HueBridgeConfKey.APP_KEY: "dummy_app_key",
 
             # shorter time will blow the tests, because an intermediate group update wil be sent!
-            HueBridgeConfKey.GROUP_DEBOUNCE_TIME: 0.01,
+            HueBridgeConfKey.GROUP_DEBOUNCE_TIME: 20,  # milliseconds
         }
         if things is None:
             things = HueBridgeSimu.configurable_things()
+            for thing in things:
+                thing._state_debounce_time = 0.02  # seconds
 
         super().__init__(config, things)
 
