@@ -87,7 +87,7 @@ class HueConnector(HueConnectorBase):
         self._hue_items: Dict[str, Union[Light, GroupedLight]] = {}
         self._light_to_group: Dict[str, str] = {}
 
-        self._room_observers: Dict[str, Optional[Observer]] = {}  # room id: observer
+        self._group_observers: Dict[str, Optional[Observer]] = {}  # group id: observer
         self._disposables: List[Disposable] = []
 
         self._next_refresh_time = self.get_next_refresh_time()
@@ -155,39 +155,39 @@ class HueConnector(HueConnectorBase):
             _logger.warning("Unknown hue items found (%s)!", ", ".join(not_found_items))
 
     def _close_group_debounces(self):
-        for observable in self._room_observers.values():
+        for observable in self._group_observers.values():
             observable.on_completed()
-        self._room_observers = {}
+        self._group_observers = {}
 
         for disposable in self._disposables:
             disposable.dispose()
         self._disposables = []
 
-    def _register_group_debounce(self, hue_room: Room):
-        def creating_room_observer_callback(observer, _):
-            self._room_observers[hue_room.id] = observer
+    def _register_group_debounce(self, hue_group: Room):
+        def creating_observer_callback(observer, _):
+            self._group_observers[hue_group.id] = observer
 
-        def feed_room_update(room_id: str):
-            hue_room_inner = self._hue_items.get(room_id)
-            if hue_room_inner:
-                self._on_state_changed(EventType.RESOURCE_UPDATED, hue_room_inner)
+        def feed_group_update(group_id_inner: str):
+            hue_group_inner = self._hue_items.get(group_id_inner)
+            if hue_group_inner:
+                self._on_state_changed(EventType.RESOURCE_UPDATED, hue_group_inner)
             else:
-                _logger.debug('No "debounced room update"" possible: room id (%s) not found! Just refreshing...?', room_id)
+                _logger.debug('No "debounced group update"" possible: group id (%s) not found! Just refreshing...?', group_id_inner)
 
-        observable = rx.create(creating_room_observer_callback)
+        observable = rx.create(creating_observer_callback)
 
         disposable = observable.pipe(
             rx_ops.debounce(self._group_debounce_time)
-        ).subscribe(lambda room_id: feed_room_update(room_id))
+        ).subscribe(lambda group_id: feed_group_update(group_id))
 
         self._disposables.append(disposable)
 
-    def _trigger_group_debounce(self, room_id):
-        observer = self._room_observers.get(room_id)
+    def _trigger_group_debounce(self, group_id):
+        observer = self._group_observers.get(group_id)
         if observer:
-            observer.on_next(room_id)
+            observer.on_next(group_id)
         else:
-            _logger.warning("'group debounce' failed, because group (%s) was not found!", room_id)
+            _logger.warning("'group debounce' failed, because group (%s) was not found!", group_id)
 
     def _on_state_changed(self, event_type: EventType, item):
         if not item or not item.id:
