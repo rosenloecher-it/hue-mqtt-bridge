@@ -403,7 +403,7 @@ class HueConnector(HueConnectorBase):
         min_brightness = device.min_brightness if device else 1
 
         if isinstance(hue_item, Light):
-            if hue_item.supports_dimming and hue_item.dimming:
+            if hue_item.dimming and hue_item.dimming.min_dim_level is not None:
                 if min_brightness < hue_item.dimming.min_dim_level:
                     min_brightness = hue_item.dimming.min_dim_level
 

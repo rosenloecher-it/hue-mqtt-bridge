@@ -117,8 +117,10 @@ class HueExplorer(HueConnectorBase):
             self.print(f"{offset}LIGHT {light.name} ({light.item.id})")
 
             dimming_info = ""
-            if light.item.supports_dimming and light.item.dimming:
-                if light.item.dimming.min_dim_level and light.item.dimming.min_dim_level >= 1:
+            if light.item.dimming:
+                if light.item.dimming.min_dim_level is None:
+                    dimming_info = " (No minimum dimming value!?)"
+                else:
                     dimming_info = f" (MIN: {round(light.item.dimming.min_dim_level)}%)" if light.item.supports_dimming else ""
 
             offset = self.get_offset(2)
