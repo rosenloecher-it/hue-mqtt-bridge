@@ -123,9 +123,13 @@ class HueConnector(HueConnectorBase):
 
         self._close_debounces()
 
+        # prepare cache first just in case
         for hue_light in self._bridge.lights:
-            self._on_state_changed(EventType.RESOURCE_UPDATED, hue_light)
+            self._hue_items[hue_light.id] = hue_light
+        for hue_group in self._bridge.groups:
+            self._hue_items[hue_group.id] = hue_group
 
+        # initialized groups
         for hue_group in self._bridge.groups:
             thing = self._things.get(hue_group.id)
             if thing:
@@ -144,14 +148,6 @@ class HueConnector(HueConnectorBase):
 
                 self._register_group_debounce(hue_group)
 
-        # second loop to registered items when the registration has finished
-        for hue_group in self._bridge.groups:
-            if isinstance(hue_group, GroupedLight):
-                self._on_state_changed(EventType.RESOURCE_UPDATED, hue_group)
-        for hue_group in self._bridge.groups:
-            if not isinstance(hue_group, GroupedLight):
-                self._on_state_changed(EventType.RESOURCE_UPDATED, hue_group)
-
         not_found_items = []
         for thing in self._things.values():
             if not self._hue_items.get(thing.hue_id):
@@ -159,9 +155,18 @@ class HueConnector(HueConnectorBase):
                 thing.close()  # sends last will if configured
             else:
                 self._register_state_debounce(thing)
-
         if not_found_items:
             _logger.warning("Unknown hue items found (%s)!", ", ".join(not_found_items))
+
+        # feed devices last. the debounce pipes get triggered in parallel
+        for hue_light in self._bridge.lights:
+            self._on_state_changed(EventType.RESOURCE_UPDATED, hue_light)
+        for hue_group in self._bridge.groups:
+            if isinstance(hue_group, GroupedLight):
+                self._on_state_changed(EventType.RESOURCE_UPDATED, hue_group)
+        for hue_group in self._bridge.groups:
+            if not isinstance(hue_group, GroupedLight):
+                self._on_state_changed(EventType.RESOURCE_UPDATED, hue_group)
 
     def _close_debounces(self):
         for observable in self._group_observers.values():
