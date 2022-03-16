@@ -49,6 +49,9 @@ class HueConnectorBase:
         self._bridge: Optional[HueBridgeV2] = None
 
         for thing in things:
+            existing_thing = self._things.get(thing.hue_id)
+            if existing_thing:
+                raise ConfigException(f"Hue item '{thing.hue_id}' is already registered as thing '{thing.name}'!")
             self._things[thing.hue_id] = thing
 
     async def connect(self):
