@@ -183,6 +183,7 @@ class MqttClient:
     def _on_message(self, _mqtt_client, _userdata, mqtt_message: mqtt.MQTTMessage):
         """MQTT callback when a message is received from MQTT server"""
         with self._lock:
+            _logger.debug("on_message(%s): %s", mqtt_message.topic, mqtt_message.payload)
             self._messages.append(mqtt_message)
 
     def _on_publish(self, mqtt_client, userdata, mid):
