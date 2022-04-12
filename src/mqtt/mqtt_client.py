@@ -136,8 +136,6 @@ class MqttClient:
         if self._shutdown:
             return
 
-        self.ensure_connection()
-
         retain = self.DEFAULT_RETAIN if retain is None else retain
         qos = self.DEFAULT_QOS if qos is None else qos
 
