@@ -99,3 +99,6 @@ class MqttProxy:
                 payload = self.ensure_string(message.payload)
                 for listener in listeners:
                     listener.process_mqtt_command(topic, payload)
+
+        if not messages:
+            self._mqtt_client.ensure_connection()
