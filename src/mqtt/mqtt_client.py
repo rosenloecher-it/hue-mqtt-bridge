@@ -6,7 +6,7 @@ from typing import Dict, Optional, Union, List
 import paho.mqtt.client as mqtt
 
 from src.mqtt.mqtt_config import MqttConfKey
-
+from src.utils.json_utils import JsonUtils
 
 _logger = logging.getLogger(__name__)
 
@@ -117,7 +117,7 @@ class MqttClient:
         qos = self.DEFAULT_QOS if qos is None else qos
 
         if isinstance(last_will, dict):
-            last_will = json.dumps(last_will, sort_keys=True)
+            last_will = JsonUtils.dumps(last_will)
 
         self._client.will_set(
             topic=topic,
@@ -140,7 +140,7 @@ class MqttClient:
         qos = self.DEFAULT_QOS if qos is None else qos
 
         if isinstance(payload, dict):
-            payload = json.dumps(payload, sort_keys=True)
+            payload = JsonUtils.dumps(payload)
 
         result = self._client.publish(
             topic=topic,
