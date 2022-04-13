@@ -7,7 +7,7 @@ import attr
 from src.thing.thing_config import ThingDefaults
 from src.thing.thing_event import ThingEvent
 from src.hue.hue_command import HueCommand
-from src.time_utils import TimeUtils
+from src.utils.time_utils import TimeUtils
 
 
 @attr.frozen

@@ -11,7 +11,7 @@ from src.thing.thing_event import ThingEvent, ThingStatus
 class TestThing(unittest.TestCase):
 
     # noinspection PyTypeChecker
-    @mock.patch("src.time_utils.TimeUtils.now")
+    @mock.patch("src.utils.time_utils.TimeUtils.now")
     def test_event_to_message(self, mocked_now):
         timestamp = datetime.datetime(2022, 1, 30, 10, 0, 0, tzinfo=get_localzone())
         mocked_now.return_value = timestamp

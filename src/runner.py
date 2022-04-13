@@ -9,7 +9,7 @@ from typing import Callable, Optional
 
 from src.hue.hue_connector import HueConnector
 from src.mqtt.mqtt_proxy import MqttProxy
-from src.time_utils import TimeUtils
+from src.utils.time_utils import TimeUtils
 
 _logger = logging.getLogger(__name__)
 

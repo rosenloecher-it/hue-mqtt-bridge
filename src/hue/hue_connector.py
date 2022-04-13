@@ -22,7 +22,7 @@ from src.hue.hue_config import HueBridgeConfKey, HueBridgeDefaults
 from src.hue.hue_event_converter import HueEventConverter
 from src.thing.thing import Thing
 from src.thing.thing_event import ThingEvent
-from src.time_utils import TimeUtils
+from src.utils.time_utils import TimeUtils
 
 _logger = logging.getLogger(__name__)
 

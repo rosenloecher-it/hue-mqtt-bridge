@@ -11,7 +11,7 @@ from src.hue.hue_command import HueCommand, HueCommandType, SwitchType
 from src.hue.hue_config import HueBridgeConfKey
 from src.hue.hue_connector import HueConnector
 from src.thing.thing import Thing, StateMessage
-from src.time_utils import TimeUtils
+from src.utils.time_utils import TimeUtils
 from test.hue.hue_bridge_simu import HueBridgeSimu, RoomSimu
 
 
