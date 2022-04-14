@@ -111,8 +111,6 @@ async def testable_main(
     mqtt_proxy: Optional[MqttProxy] = None
 
     try:
-        _logger.info(run_mode)
-
         if run_mode != RunMode.JSON_SCHEMA and run_mode != RunMode.DISCOVER:
             app_config = AppConfig(config_file, run_mode)
             AppLogging.configure(
@@ -131,6 +129,8 @@ async def testable_main(
                 hue_connector = HueAppKey(app_config.get_hue_bridge_config(), things)
             elif run_mode == RunMode.EXPLORE:
                 hue_connector = HueExplorer(app_config.get_hue_bridge_config(), things)
+
+        _logger.info(run_mode)
 
         if run_mode == RunMode.JSON_SCHEMA:
             AppConfig.print_config_file_json_schema()
