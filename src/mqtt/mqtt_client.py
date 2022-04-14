@@ -176,7 +176,6 @@ class MqttClient:
 
     def _on_disconnect(self, _mqtt_client, _userdata, rc):
         """MQTT callback for when the client disconnects from the MQTT server."""
-
         connection_error_info = None
         if rc != 0:
             connection_error_info = f"MQTT connection was lost (#{rc}: {mqtt.error_string(rc)}) => abort => restart!"

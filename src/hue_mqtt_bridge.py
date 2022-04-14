@@ -111,7 +111,7 @@ async def testable_main(
     mqtt_proxy: Optional[MqttProxy] = None
 
     try:
-        _logger.debug(run_mode)
+        _logger.info(run_mode)
 
         if run_mode != RunMode.JSON_SCHEMA and run_mode != RunMode.DISCOVER:
             app_config = AppConfig(config_file, run_mode)
