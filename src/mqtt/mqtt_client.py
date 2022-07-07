@@ -1,4 +1,3 @@
-import json
 import logging
 import threading
 from typing import Dict, Optional, Union, List
