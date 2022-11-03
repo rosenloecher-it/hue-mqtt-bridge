@@ -84,6 +84,7 @@ class HueConnector(HueConnectorBase):
         super().__init__(config, things)
 
         self._group_debounce_time = config.get(HueBridgeConfKey.GROUP_DEBOUNCE_TIME, HueBridgeDefaults.GROUP_DEBOUNCE_TIME) / 1000
+        self._full_reload_time = config.get(HueBridgeConfKey.FULL_RELOAD_TIME, HueBridgeDefaults.FULL_RELOAD_TIME)
 
         self._thing_commands: Deque[(Thing, HueCommand)] = deque()
 
@@ -434,6 +435,5 @@ class HueConnector(HueConnectorBase):
 
         return command
 
-    @classmethod
-    def get_next_refresh_time(cls) -> datetime.datetime:
-        return TimeUtils.now() + datetime.timedelta(seconds=1800)
+    def get_next_refresh_time(self) -> datetime.datetime:
+        return TimeUtils.now() + datetime.timedelta(seconds=self._full_reload_time)
