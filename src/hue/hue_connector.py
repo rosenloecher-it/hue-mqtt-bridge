@@ -159,7 +159,7 @@ class HueConnector(HueConnectorBase):
         if not_found_items:
             _logger.warning("Unknown hue items found (%s)!", ", ".join(not_found_items))
 
-        # feed devices last. the debounce pipes get triggered in parallel
+        # feed devices last. the "debounce pipes" get triggered in parallel
         for hue_light in self._bridge.lights:
             self._on_state_changed(EventType.RESOURCE_UPDATED, hue_light)
         for hue_group in self._bridge.groups:

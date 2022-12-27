@@ -31,7 +31,7 @@ class Thing:
         self._min_brightness = min_brightness
         self._state_debounce_time = state_debounce_time
 
-        self.__logger = None  # type: Optional[Logger]
+        self.__logger: Optional[Logger] = None
 
         self._messages: List[StateMessage] = None
         self._hue_command: Optional[HueCommand] = None
