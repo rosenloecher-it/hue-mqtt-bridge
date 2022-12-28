@@ -367,42 +367,45 @@ class HueConnector(HueConnectorBase):
     async def _send_command(self, hue_item: Union[Light, Room], command: HueCommand):
         # _logger.debug("send_device_command:\n%s\n%s", hue_item, command)
 
-        command = self._prepare_dim_to_switch_off_command(hue_item, command)
+        command = self._prepare_dim_to_switch_command(hue_item, command)
+        brightness: Optional[float] = None
 
-        if isinstance(hue_item, Light):
-            brightness: Optional[float] = None
+        if command.type == HueCommandType.DIM:
+            min_brightness = self._get_min_brightness(hue_item)
+            on = command.dim >= min_brightness
+            brightness = command.dim
+        elif command.type == HueCommandType.SWITCH:
+            on = True if command.switch == SwitchType.ON else False
+        else:
+            raise ValueError(f"Unsupported command ({command})!")
 
-            if command.type == HueCommandType.DIM:
-                min_brightness = self._get_min_brightness(hue_item)
-                on = command.dim >= min_brightness
-                brightness = command.dim
-            elif command.type == HueCommandType.SWITCH:
-                on = True if command.switch == SwitchType.ON else False
-            else:
-                raise ValueError(f"Unsupported command ({command})!")
+        await self._set_light(hue_item, on, brightness)
 
-            await self._set_light(hue_item, on, brightness)
-
-        elif isinstance(hue_item, Room):
-            hue_children = self._get_lights_for_group(hue_item)
-            for hue_child in hue_children:
-                await self._send_command(hue_child, command)
-
-    async def _set_light(self, hue_item: Light, on: Optional[bool], brightness: Optional[float]):
+    async def _set_light(self, hue_item: Union[Light, Room], on: Optional[bool], brightness: Optional[float]):
+        log_info = "bridge.*.set_state"
         try:
-            await self._bridge.lights.set_state(hue_item.id, on=on, brightness=brightness)
+            if isinstance(hue_item, Light):
+                log_info = "bridge.lights.set_state"
+                await self._bridge.lights.set_state(hue_item.id, on=on, brightness=brightness)
+            elif isinstance(hue_item, Room):
+                log_info = "bridge.groups.grouped_light.set_state"
+                grouped_light = self._hue_items.get(hue_item.grouped_light)
+                await self._bridge.groups.grouped_light.set_state(grouped_light.id, on=on, brightness=brightness)
+            else:
+                raise Exception(f"_set_light doesn't support '{type(hue_item)}'!")
+
         except aiohue.errors.AiohueException as ex:
             # further analysis needed!
-            _logger.error("error bridge.lights.set_state(%s, %s, %s): %s", hue_item, on, brightness, ex)
+            _logger.error("%s(%s, %s, %s): %s", log_info, hue_item, on, brightness, ex)
 
-    def _prepare_dim_to_switch_off_command(self, hue_item: Union[Light, Room], command: HueCommand) -> HueCommand:
+    def _prepare_dim_to_switch_command(self, hue_item: Union[Light, Room], command: HueCommand) -> HueCommand:
         if command.type == HueCommandType.DIM:
             min_brightness = self._get_min_brightness(hue_item)
             if command.dim < min_brightness:  # Room | Light
                 command = HueCommand.create_switch(SwitchType.OFF)
                 return command
             elif isinstance(hue_item, Light) and not hue_item.supports_dimming:
-                command = HueCommand.create_switch(SwitchType.ON)
+                command = HueCommand.create_switch(SwitchType.ON if command.dim >= min_brightness else SwitchType.OFF)
                 return command
 
         return command
