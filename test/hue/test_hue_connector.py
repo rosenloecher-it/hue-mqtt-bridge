@@ -34,138 +34,86 @@ class TestHueConnector(IsolatedAsyncioTestCase):
             retain=HueBridgeSimu.DEFAULT_RETAIN,
         )
 
-    async def test_invalid_command(self):
+    async def test_command_invalid(self):
         # noinspection SpellCheckingInspection
         await self.connector.simu_command(HueBridgeSimu.ID_GROUP, "afasfdsafa")
         self.connector.set_light.assert_not_called()
         result_messages = self.connector.get_state_message()
         self.assertEqual(result_messages, [])
 
-    async def test_group_on_off(self):
-        calls_on = [
-            call(id=HueBridgeSimu.ID_COLOR1, on=True, brightness=None),
-            call(id=HueBridgeSimu.ID_COLOR2, on=True, brightness=None),
-        ]
-        calls_off = [
-            call(id=HueBridgeSimu.ID_COLOR1, on=False, brightness=None),
-            call(id=HueBridgeSimu.ID_COLOR2, on=False, brightness=None),
-        ]
-        expected_messages_on = [
-            self.state_message(HueBridgeSimu.ID_COLOR1, "on", brightness=100),
-            self.state_message(HueBridgeSimu.ID_COLOR2, "on", brightness=100),
-            self.state_message(HueBridgeSimu.ID_GROUP, "on", hue_type="group", brightness=100),
-        ]
-        expected_messages_off = [
-            self.state_message(HueBridgeSimu.ID_COLOR1, "off", brightness=0),
-            self.state_message(HueBridgeSimu.ID_COLOR2, "off", brightness=0),
-            self.state_message(HueBridgeSimu.ID_GROUP, "off", hue_type="group", brightness=0),
-        ]
-
+    async def test_command_group_on_off(self):
         # switch on
         await self.connector.simu_command(HueBridgeSimu.ID_GROUP, "on")
-        self.connector.set_light.assert_has_calls(calls_on)
-        result_messages = self.connector.get_state_message()
-        self.assertCountEqual(result_messages, expected_messages_on)
+        self.connector.set_light.assert_has_calls([
+            call(id=HueBridgeSimu.ID_GROUP, on=True, brightness=None),
+        ])
 
         # switch off
         self.connector.reset_actions()
         await self.connector.simu_command(HueBridgeSimu.ID_GROUP, "off")
-        self.connector.set_light.assert_has_calls(calls_off)
-        result_messages = self.connector.get_state_message()
-        self.assertCountEqual(result_messages, expected_messages_off)
+        self.connector.set_light.assert_has_calls([
+            call(id=HueBridgeSimu.ID_GROUP, on=False, brightness=None),
+        ])
 
         # toggle on
         self.connector.reset_actions()
+        self.connector.prepare_on_state(HueBridgeSimu.ID_GROUPED_LIGHT, False)
         await self.connector.simu_command(HueBridgeSimu.ID_GROUP, "toggle")
-        self.connector.set_light.assert_has_calls(calls_on)
-        result_messages = self.connector.get_state_message()
-        self.assertCountEqual(result_messages, expected_messages_on)
+        self.connector.set_light.assert_has_calls([
+            call(id=HueBridgeSimu.ID_GROUP, on=True, brightness=None),
+        ])
 
         # toggle off
         self.connector.reset_actions()
+        self.connector.prepare_on_state(HueBridgeSimu.ID_GROUPED_LIGHT, True)
         await self.connector.simu_command(HueBridgeSimu.ID_GROUP, "toggle")
-        self.connector.set_light.assert_has_calls(calls_off)
-        result_messages = self.connector.get_state_message()
-        self.assertCountEqual(result_messages, expected_messages_off)
+        self.connector.set_light.assert_has_calls([
+            call(id=HueBridgeSimu.ID_GROUP, on=False, brightness=None),
+        ])
 
-    async def test_group_dim(self):
-        calls_69 = [
-            call(id=HueBridgeSimu.ID_COLOR1, on=True, brightness=69),
-            call(id=HueBridgeSimu.ID_COLOR2, on=True, brightness=69),
-        ]
-        calls_off = [
-            call(id=HueBridgeSimu.ID_COLOR1, on=False, brightness=None),
-            call(id=HueBridgeSimu.ID_COLOR2, on=False, brightness=None),
-        ]
-        expected_messages_69 = [
-            self.state_message(HueBridgeSimu.ID_COLOR1, "on", brightness=69),
-            self.state_message(HueBridgeSimu.ID_COLOR2, "on", brightness=69),
-            self.state_message(HueBridgeSimu.ID_GROUP, "on", hue_type="group", brightness=69),
-        ]
-        expected_messages_off = [
-            self.state_message(HueBridgeSimu.ID_COLOR1, "off", brightness=0),
-            self.state_message(HueBridgeSimu.ID_COLOR2, "off", brightness=0),
-            self.state_message(HueBridgeSimu.ID_GROUP, "off", hue_type="group", brightness=0),
-        ]
-
+    async def test_command_group_dim(self):
         await self.connector.simu_command(HueBridgeSimu.ID_GROUP, "69")
-        self.connector.set_light.assert_has_calls(calls_69)
-        result_messages = self.connector.get_state_message()
-        self.assertCountEqual(result_messages, expected_messages_69)
+        self.connector.set_light.assert_has_calls([
+            call(id=HueBridgeSimu.ID_GROUP, on=True, brightness=69),
+        ])
 
         # dim group off => switch off
         self.connector.reset_actions()
         await self.connector.simu_command(HueBridgeSimu.ID_GROUP, "15")
-        self.connector.set_light.assert_has_calls(calls_off)
-        result_messages = self.connector.get_state_message()
-        self.assertCountEqual(result_messages, expected_messages_off)
+        self.connector.set_light.assert_has_calls([
+            call(id=HueBridgeSimu.ID_GROUP, on=False, brightness=None),
+        ])
 
-        # dim on again
-        self.connector.reset_actions()
-        await self.connector.simu_command(HueBridgeSimu.ID_GROUP, "69")
-        self.connector.set_light.assert_has_calls(calls_69)
-        result_messages = self.connector.get_state_message()
-        self.assertCountEqual(result_messages, expected_messages_69)
-
-    async def test_switch_dim(self):
-        """the switch down not supports dimming and is supposed to toggle around the configured min brightness"""
-        calls_on = [
-            call(id=HueBridgeSimu.ID_SWITCH, on=True, brightness=None),
-        ]
-        calls_off = [
-            call(id=HueBridgeSimu.ID_SWITCH, on=False, brightness=None),
-        ]
-        expected_messages_on = [
-            self.state_message(HueBridgeSimu.ID_SWITCH, "on", brightness=None),
-        ]
-        expected_messages_off = [
-            self.state_message(HueBridgeSimu.ID_SWITCH, "off", brightness=None),
-        ]
-
+    async def test_command_dim_to_switch(self):
         # dim => on
         await self.connector.simu_command(HueBridgeSimu.ID_SWITCH, "69")
-        self.connector.set_light.assert_has_calls(calls_on)
-        result_messages = self.connector.get_state_message()
-        self.assertEqual(result_messages, expected_messages_on)
+        self.connector.set_light.assert_has_calls([
+            call(id=HueBridgeSimu.ID_SWITCH, on=True, brightness=None),
+        ])
 
         # dim => off
         self.connector.reset_actions()
         await self.connector.simu_command(HueBridgeSimu.ID_SWITCH, "5")
-        self.connector.set_light.assert_has_calls(calls_off)
+        self.connector.set_light.assert_has_calls([
+            call(id=HueBridgeSimu.ID_SWITCH, on=False, brightness=None),
+        ])
+
+    async def test_on_state_changed_light(self):
+        await self.connector.simu_on_state_changed(HueBridgeSimu.ID_SWITCH, True)
+
         result_messages = self.connector.get_state_message()
-        self.assertEqual(result_messages, expected_messages_off)
+        self.assertCountEqual(result_messages, [
+            self.state_message(HueBridgeSimu.ID_SWITCH, "on", brightness=None),
+        ])
 
-    async def test_single_dim_triggers_group_message(self):
-        calls = [call(id=HueBridgeSimu.ID_COLOR1, on=True, brightness=80)]
+    async def test_on_state_changed_group(self):
+        self.connector.prepare_dim_state(HueBridgeSimu.ID_COLOR1, 69)
+        self.connector.prepare_on_state(HueBridgeSimu.ID_COLOR1, True)
+        self.connector.prepare_dim_state(HueBridgeSimu.ID_COLOR2, 69)
+        self.connector.prepare_on_state(HueBridgeSimu.ID_COLOR2, True)
+        await self.connector.simu_on_state_changed(HueBridgeSimu.ID_GROUPED_LIGHT, True)
 
-        await self.connector.simu_command(HueBridgeSimu.ID_COLOR1, "80")
-        self.connector.set_light.assert_has_calls(calls)
         result_messages = self.connector.get_state_message()
-        self.assertEqual(len(result_messages), 2)
-
-        color_message = next(filter(lambda m: m.topic == "color1/state", result_messages))
-        self.assertEqual(color_message, self.state_message(HueBridgeSimu.ID_COLOR1, "on", brightness=80))
-
-        group_message = next(filter(lambda m: m.topic == "group/state", result_messages))
-        # missing group light update in simu, so state is still off, but it gets triggered at all a calculated the brightness
-        self.assertEqual(group_message.payload["brightness"], 40)
+        self.assertCountEqual(result_messages, [
+            self.state_message(HueBridgeSimu.ID_GROUP, "on", brightness=69, hue_type="group"),
+        ])

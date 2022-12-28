@@ -78,6 +78,7 @@ class HueBridgeSimu:
     ID_SWITCH = "switch"  # single light
     ID_DIMMER = "dimmer"  # single light
     ID_GROUP = "group"
+    ID_GROUPED_LIGHT = "grouped_light"
     ID_COLOR1 = "color1"  # assigned to "group"
     ID_COLOR2 = "color2"  # assigned to "group"
 
@@ -131,7 +132,7 @@ class HueBridgeSimu:
         hue_color2 = cls.create_hue_color_light(cls.ID_COLOR2, switch_device_id)
         hue_device2 = cls.create_hue_device(switch_device_id, hue_color2.id)
 
-        hue_grouped_light = cls.create_hue_group_light("grouped_light-" + cls.ID_GROUP)
+        hue_grouped_light = cls.create_hue_group_light(cls.ID_GROUPED_LIGHT)
         hue_room = cls.create_hue_room(
             cls.ID_GROUP,
             light_device_ids=[hue_device1.id, hue_device2.id],
