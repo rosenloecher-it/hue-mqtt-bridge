@@ -150,7 +150,7 @@ class HueConnectorBase:
             if not isinstance(hue_group, GroupedLight):
                 self._on_state_changed(EventType.RESOURCE_UPDATED, hue_group)
 
-    async def run_tools(self):
+    async def run_cli_tools(self):
         """cli functionality"""
         # do nothing in base implementation!
 

@@ -48,7 +48,7 @@ class TestHueExplorer(IsolatedAsyncioTestCase):
         await self.explorer.close()
 
     async def test_explore(self):
-        await self.explorer.run_tools()
+        await self.explorer.run_cli_tools()
 
         things = HueBridgeSimu.configurable_things()
         for thing in things:

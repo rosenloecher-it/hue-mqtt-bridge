@@ -153,7 +153,7 @@ class HueExplorer(HueConnectorBase):
             message = Thing.event_to_message(thing_event)
             self.print(f"{offset}CURRENT STATE: {message}")
 
-    async def run_tools(self):
+    async def run_cli_tools(self):
         if not self._bridge:
             await self.connect()
 

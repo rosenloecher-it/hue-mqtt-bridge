@@ -137,9 +137,9 @@ async def testable_main(
         elif run_mode == RunMode.DISCOVER:
             await HueExplorer.discover()
         elif run_mode == RunMode.EXPLORE:
-            await hue_connector.run_tools()  # no loop
+            await hue_connector.run_cli_tools()  # no loop
         elif run_mode == RunMode.CREATE_APP_KEY:
-            await hue_connector.run_tools()  # no loop
+            await hue_connector.run_cli_tools()  # no loop
         else:
             runner = Runner(hue_connector, mqtt_proxy)
             await runner.run()
