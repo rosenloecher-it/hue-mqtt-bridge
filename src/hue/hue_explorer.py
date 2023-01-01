@@ -9,7 +9,7 @@ from aiohue.v2 import DevicesController, LightsController, GroupsController
 from aiohue.v2.models.room import Room
 
 from src.hue.hue_connector import HueConnectorBase
-from src.thing.thing import Thing
+from src.utils.json_utils import JsonUtils
 
 _logger = logging.getLogger(__name__)
 
@@ -150,7 +150,7 @@ class HueExplorer(HueConnectorBase):
             self.print(f"{offset}LAST WILL:     {thing.last_will}")
 
             thing_event = self._generate_thing_status(hue_item.item)
-            message = Thing.event_to_message(thing_event)
+            message = JsonUtils.dumps(thing_event.to_data())
             self.print(f"{offset}CURRENT STATE: {message}")
 
     async def run_cli_tools(self):

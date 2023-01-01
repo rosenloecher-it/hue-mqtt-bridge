@@ -7,7 +7,6 @@ import attr
 from src.thing.thing_config import ThingDefaults
 from src.thing.thing_event import ThingEvent
 from src.hue.hue_command import HueCommand
-from src.utils.time_utils import TimeUtils
 
 
 @attr.frozen
@@ -129,33 +128,12 @@ class Thing:
         finally:
             self._hue_command = None
 
-    @classmethod
-    def event_to_message(cls, event: ThingEvent) -> Dict[str, any]:
-        data = {
-            "name": event.name
-        }
-
-        if not event.status:
-            data["status"] = "error"
-        else:
-            data["status"] = event.status.value
-
-        if event.brightness is not None:
-            data["brightness"] = int(round(event.brightness))
-
-        data["timestamp"] = TimeUtils.now(no_ms=True).isoformat()
-
-        return data
-
     def process_state_change(self, event: ThingEvent):
         if self._closed:
             return
 
-        # self._logger.debug("process_state_change: %s", event)
-        payload = self.event_to_message(event)
-
         self._add_state_message(StateMessage(
             topic=self._state_topic,
-            payload=payload,
+            payload=event.to_data(),
             retain=self._retain
         ))

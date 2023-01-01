@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 from collections import deque
 from typing import Dict, List, Optional, Deque
@@ -8,6 +7,7 @@ from paho.mqtt.client import MQTTMessage
 
 from src.thing.thing import Thing, StateMessage
 from src.mqtt.mqtt_client import MqttClient
+from src.utils.json_utils import JsonUtils
 
 _logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ class MqttProxy:
             m = self._state_messages.popleft()
             payload = m.payload
             if isinstance(payload, dict):
-                payload = json.dumps(payload, sort_keys=True)
+                payload = JsonUtils.dumps(payload)
             self._mqtt_client.publish(topic=m.topic, payload=payload, retain=m.retain)
 
     async def process_timer(self):
