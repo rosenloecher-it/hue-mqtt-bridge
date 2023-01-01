@@ -46,6 +46,11 @@ class HueConnectorBase:
         self._app_key = config[HueBridgeConfKey.APP_KEY]
         self._things: Dict[str, Thing] = {}
 
+        self._group_children: Dict[str, List[str]] = {}
+        self._grouped_light_to_group: Dict[str, str] = {}
+        self._hue_items: Dict[str, Union[Light, GroupedLight]] = {}
+        self._light_to_group: Dict[str, str] = {}
+
         self._bridge: Optional[HueBridgeV2] = None
 
         for thing in things:
@@ -56,6 +61,8 @@ class HueConnectorBase:
 
     async def connect(self):
         await self._initialize_hue_bridge()
+
+        self._rebuild_caches()
 
     async def _initialize_hue_bridge(self):
         if self._bridge:
@@ -68,53 +75,27 @@ class HueConnectorBase:
 
         await self._bridge.initialize()
 
+        self._bridge.subscribe(self._on_state_changed)
+
     async def close(self):
         if self._bridge:
             await self._bridge.close()
             self._bridge = None
 
-    async def run_tools(self):
-        """put main functionality here"""
-        # do nothing in base implementation!
-
-
-class HueConnector(HueConnectorBase):
-
-    def __init__(self, config, things: List[Thing]):
-        super().__init__(config, things)
-
-        self._group_debounce_time = config.get(HueBridgeConfKey.GROUP_DEBOUNCE_TIME, HueBridgeDefaults.GROUP_DEBOUNCE_TIME) / 1000
-        self._full_reload_time = config.get(HueBridgeConfKey.FULL_RELOAD_TIME, HueBridgeDefaults.FULL_RELOAD_TIME)
-
-        self._thing_commands: Deque[(Thing, HueCommand)] = deque()
-
-        self._group_children: Dict[str, List[str]] = {}
-        self._grouped_light_to_group: Dict[str, str] = {}
-        self._hue_items: Dict[str, Union[Light, GroupedLight]] = {}
-        self._light_to_group: Dict[str, str] = {}
-
-        self._group_observers: Dict[str, Optional[Observer]] = {}  # group id: observer
-        self._state_observers: Dict[str, Optional[Observer]] = {}  # thing id: observer
-        self._disposables: List[Disposable] = []
-
-        self._next_refresh_time = self.get_next_refresh_time()
-
-    async def connect(self):
-        await self._initialize_hue_bridge()
-
-        self._rebuild_caches()
-        self._next_refresh_time = self.get_next_refresh_time()
-
-    async def close(self):
-        await super().close()
-
         self._close_debounces()
         self._hue_items = {}
 
-    async def _initialize_hue_bridge(self):
-        await super()._initialize_hue_bridge()
+    def _close_debounces(self):
+        pass
 
-        self._bridge.subscribe(self._on_state_changed)
+    def _register_group_debounce(self, hue_group: Room):
+        pass
+
+    def _register_state_debounce(self, thing: Thing):
+        pass
+
+    def _on_state_changed(self, event_type: EventType, item):
+        pass
 
     def _rebuild_caches(self):
         self._group_children = {}
@@ -168,6 +149,111 @@ class HueConnector(HueConnectorBase):
         for hue_group in self._bridge.groups:
             if not isinstance(hue_group, GroupedLight):
                 self._on_state_changed(EventType.RESOURCE_UPDATED, hue_group)
+
+    async def run_tools(self):
+        """cli functionality"""
+        # do nothing in base implementation!
+
+    def _generate_thing_status(self, item: Union[Light, Room], event_type: EventType = EventType.RESOURCE_UPDATED) -> ThingEvent:
+        group_item = None
+        event_item = item
+        thing = self._things.get(item.id)
+        if not thing:
+            return None
+
+        if isinstance(item, Room):
+            group_item = item
+            event_item = self._hue_items.get(group_item.grouped_light)
+            if not event_item:
+                _logger.warning("cannot found group light for '%s'", thing.name)
+                return None
+
+        thing_event = HueEventConverter.to_thing_event(event_type, event_item, thing.name)
+        if group_item is not None:
+            thing_event.id = thing.hue_id
+            thing_event.name = thing.name
+            thing_event.brightness = self._get_average_brightness_for_group(group_item)
+
+        return thing_event
+
+    def _find_lights_for_group(self, hue_group: Room) -> List[str]:
+        """find all light ids for a group"""
+        device_children: Dict[str, Set[str]] = {}
+        cached_lights: Dict[str, Light] = {}
+
+        for hue_device in self._bridge.devices:
+            device_children[hue_device.id] = hue_device.lights
+        for hue_light in self._bridge.lights:
+            cached_lights[hue_light.id] = hue_light
+
+        hue_children_ids = []
+
+        if isinstance(hue_group, Room):
+            for child_resource in hue_group.children:
+                child_light_ids = list(device_children.get(child_resource.rid, set()))
+                for child_light_id in child_light_ids:
+                    hue_child = cached_lights.get(child_light_id)
+                    hue_children_ids.append(hue_child.id)
+
+        if not hue_children_ids:
+            _logger.warning("No children found for '%s' ('%s')!", hue_group.metadata.name, hue_group.id)
+
+        return hue_children_ids
+
+    def _get_average_brightness_for_group(self, hue_group: Room) -> Optional[float]:
+        hue_children = self._get_lights_for_group(hue_group)
+
+        dimming_count = 0
+        children_count = 0
+        brightness_sum = 0
+
+        for hue_child in hue_children:
+            if isinstance(hue_child, Light):
+                children_count += 1
+                is_on = hue_child.on.on
+                if hue_child.dimming:
+                    dimming_count += 1
+                    brightness_sum += hue_child.dimming.brightness if is_on else 0
+                else:
+                    brightness_sum += 100.0 if is_on else 0
+
+        if dimming_count == 0:
+            return None
+
+        average = brightness_sum / children_count
+        return average
+
+    def _get_lights_for_group(self, hue_group: Room) -> List[Light]:
+        hue_children_ids = self._group_children.get(hue_group.id)
+        hue_children = []
+        for hue_child_id in hue_children_ids:
+            hue_child = self._hue_items.get(hue_child_id)
+            if hue_child:
+                hue_children.append(hue_child)
+
+        return hue_children
+
+
+class HueConnector(HueConnectorBase):
+
+    def __init__(self, config, things: List[Thing]):
+        super().__init__(config, things)
+
+        self._group_debounce_time = config.get(HueBridgeConfKey.GROUP_DEBOUNCE_TIME, HueBridgeDefaults.GROUP_DEBOUNCE_TIME) / 1000
+        self._full_reload_time = config.get(HueBridgeConfKey.FULL_RELOAD_TIME, HueBridgeDefaults.FULL_RELOAD_TIME)
+
+        self._thing_commands: Deque[(Thing, HueCommand)] = deque()
+
+        self._group_observers: Dict[str, Optional[Observer]] = {}  # group id: observer
+        self._state_observers: Dict[str, Optional[Observer]] = {}  # thing id: observer
+        self._disposables: List[Disposable] = []
+
+        self._next_refresh_time = self.get_next_refresh_time()
+
+    async def connect(self):
+        await super().connect()
+
+        self._next_refresh_time = self.get_next_refresh_time()
 
     def _close_debounces(self):
         for observable in self._group_observers.values():
@@ -254,27 +340,12 @@ class HueConnector(HueConnectorBase):
             if group_id:
                 self._trigger_group_debounce(group_id)
 
-        group_item = None
-        event_item = item
-        thing = self._things.get(item.id)
-        if not thing:
-            return
+        thing_event = self._generate_thing_status(item, event_type)
+        if not thing_event:
+            return  # item is not configured
 
-        if isinstance(item, Room):
-            group_item = item
-            event_item = self._hue_items.get(group_item.grouped_light)
-            if not event_item:
-                _logger.warning("cannot found group light for '%s'", thing.name)
-                return
-
-        thing_event = HueEventConverter.to_thing_event(event_type, event_item, thing.name)
-        if group_item is not None:
-            thing_event.id = thing.hue_id
-            thing_event.name = thing.name
-            thing_event.brightness = self._get_average_brightness_for_group(group_item)
-
-        # _logger.debug("_on_state_changed: %s, %s => %s", event_type, item, thing_event)
-        observer = self._state_observers.get(thing.hue_id)
+        _logger.debug("_on_state_changed: %s, %s => %s", event_type, item, thing_event)
+        observer = self._state_observers.get(thing_event.id)
         if observer:
             observer.on_next(thing_event)
 
@@ -285,63 +356,6 @@ class HueConnector(HueConnectorBase):
             _logger.info("full refresh")
             await self._bridge.fetch_full_state()
             self._rebuild_caches()
-
-    def _get_average_brightness_for_group(self, hue_group: Room) -> Optional[float]:
-        hue_children = self._get_lights_for_group(hue_group)
-
-        dimming_count = 0
-        brightness_count = 0
-        brightness_sum = 0
-
-        for hue_child in hue_children:
-            if isinstance(hue_child, Light):
-                brightness_count += 1
-                is_on = hue_child.on.on
-                if hue_child.dimming:
-                    dimming_count += 1
-                    brightness_sum += hue_child.dimming.brightness if is_on else 0
-                else:
-                    brightness_sum += 100.0 if is_on else 0
-
-        if dimming_count == 0:
-            return None
-
-        average = brightness_sum / brightness_count
-        return average
-
-    def _get_lights_for_group(self, hue_group: Room) -> List[Light]:
-        hue_children_ids = self._group_children.get(hue_group.id)
-        hue_children = []
-        for hue_child_id in hue_children_ids:
-            hue_child = self._hue_items.get(hue_child_id)
-            if hue_child:
-                hue_children.append(hue_child)
-
-        return hue_children
-
-    def _find_lights_for_group(self, hue_group: Room) -> List[str]:
-        """find all light ids for a group"""
-        device_children: Dict[str, Set[str]] = {}
-        cached_lights: Dict[str, Light] = {}
-
-        for hue_device in self._bridge.devices:
-            device_children[hue_device.id] = hue_device.lights
-        for hue_light in self._bridge.lights:
-            cached_lights[hue_light.id] = hue_light
-
-        hue_children_ids = []
-
-        if isinstance(hue_group, Room):
-            for child_resource in hue_group.children:
-                child_light_ids = list(device_children.get(child_resource.rid, set()))
-                for child_light_id in child_light_ids:
-                    hue_child = cached_lights.get(child_light_id)
-                    hue_children_ids.append(hue_child.id)
-
-        if not hue_children_ids:
-            _logger.warning("No children found for '%s' ('%s')!", hue_group.metadata.name, hue_group.id)
-
-        return hue_children_ids
 
     def fetch_commands(self) -> bool:
         for device in self._things.values():
