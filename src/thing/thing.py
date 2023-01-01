@@ -131,22 +131,17 @@ class Thing:
 
     @classmethod
     def event_to_message(cls, event: ThingEvent) -> Dict[str, any]:
-        # noinspection PyDataclass
-        data = attr.asdict(event)
+        data = {
+            "name": event.name
+        }
 
-        for key in list(data.keys()):
-            if data[key] is None:
-                del data[key]
-
-        status = data.get("status")
-        if not data.get("status"):
+        if not event.status:
             data["status"] = "error"
         else:
-            data["status"] = status.value
+            data["status"] = event.status.value
 
-        brightness = data.get("brightness")
-        if brightness is not None:
-            data["brightness"] = int(round(brightness))
+        if event.brightness is not None:
+            data["brightness"] = int(round(event.brightness))
 
         data["timestamp"] = TimeUtils.now(no_ms=True).isoformat()
 

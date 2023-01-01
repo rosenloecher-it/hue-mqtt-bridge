@@ -17,13 +17,11 @@ class TestHueConnector(IsolatedAsyncioTestCase):
         await self.connector.close()
 
     @classmethod
-    def state_message(cls, hue_id: str, status: str, hue_type="light", brightness=None):
+    def state_message(cls, hue_id: str, status: str, brightness=None):
         """generate an expected state message"""
         payload = {
-            "id": hue_id,
             "name": hue_id,
             "status": status,
-            "type": hue_type,
         }
         if brightness is not None:
             payload["brightness"] = brightness
@@ -115,5 +113,5 @@ class TestHueConnector(IsolatedAsyncioTestCase):
 
         result_messages = self.connector.get_state_message()
         self.assertCountEqual(result_messages, [
-            self.state_message(HueBridgeSimu.ID_GROUP, "on", brightness=69, hue_type="group"),
+            self.state_message(HueBridgeSimu.ID_GROUP, "on", brightness=69),
         ])

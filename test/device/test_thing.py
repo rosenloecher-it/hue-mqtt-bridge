@@ -25,9 +25,7 @@ class TestThing(unittest.TestCase):
 
         expected = {
             "brightness": 69,
-            "id": e.id,
             "name": e.name,
-            "type": e.type,
             "status": "off",
             "timestamp": timestamp.isoformat(),
         }
