@@ -18,14 +18,7 @@ class HueEventConverter:
         e = ThingEvent(status=ThingStatus.ERROR)
 
         e.id = item.id
-
-        if name is not None:
-            e.name = name
-        else:
-            if hasattr(item, "metadata") and hasattr(item.metadata, "name"):
-                name = item.metadata.name
-                if isinstance(name, str):
-                    e.name = name
+        e.name = name
 
         if event_type in [EventType.RESOURCE_DELETED, EventType.DISCONNECTED]:
             e.status = ThingStatus.OFFLINE

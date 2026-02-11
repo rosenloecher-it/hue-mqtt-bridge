@@ -6,6 +6,7 @@ from typing import Dict, Union
 import attr
 from aiohue.discovery import discover_nupnp
 from aiohue.v2 import DevicesController, LightsController, GroupsController
+from aiohue.v2.models.resource import ResourceTypes
 from aiohue.v2.models.room import Room
 
 from src.hue.hue_connector import HueConnectorBase
@@ -62,7 +63,12 @@ class HueExplorer(HueConnectorBase):
 
         lights = []
         for light in self._bridge.lights:
-            lights.append(HueItem(item=light, name=light.metadata.name, type=light.type.name))
+            name = ""
+            if light.owner.rtype == ResourceTypes.DEVICE:
+                device = cache.devices.get(light.owner.rid)
+                if device:
+                    name = device.name
+            lights.append(HueItem(item=light, name=name, type=light.type.name))
         lights = sorted(lights, key=lambda l: l.name.lower())
         cache.lights = OrderedDict({c.item.id: c for c in lights})
 

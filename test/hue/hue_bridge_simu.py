@@ -198,6 +198,7 @@ class HueBridgeSimu:
             on=OnFeature(on=False),
             alert=AlertFeature(action_values=[AlertEffectType.BREATHE]),
             type=ResourceTypes.GROUPED_LIGHT,
+            owner=ResourceIdentifier(rid=test_id, rtype=ResourceTypes.GROUPED_LIGHT)
         )
 
     @classmethod
@@ -205,7 +206,6 @@ class HueBridgeSimu:
         return Light(
             id=light_id,
             id_v1=f"/lights/{light_id}",
-            metadata=LightMetaData(archetype="icon", name=light_id),
             on=OnFeature(on=False),
             dimming=DimmingFeature(brightness=100.0, min_dim_level=cls.MIN_DIM_LIGHT),
             color_temperature=None,

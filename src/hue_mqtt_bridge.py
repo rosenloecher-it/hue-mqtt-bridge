@@ -76,7 +76,8 @@ def _main(
     config_error_code = 78  # sysexits.h: define EX_CONFIG 78 /* configuration error */
 
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         try:
             loop.run_until_complete(testable_main(
                 create_app_key, discover, explore, json_schema, config_file, log_file, log_level, print_log_console, skip_log_times

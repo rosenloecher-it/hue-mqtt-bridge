@@ -4,7 +4,7 @@ from aiohue.v2 import EventType
 from aiohue.v2.models.feature import AlertFeature, AlertEffectType, OnFeature, DimmingFeature, ColorFeature, ColorPoint, ColorGamut, \
     GamutType, DynamicsFeature, DynamicStatus
 from aiohue.v2.models.grouped_light import GroupedLight
-from aiohue.v2.models.light import Light, LightMetaData, LightMode
+from aiohue.v2.models.light import Light, LightMode
 from aiohue.v2.models.resource import ResourceIdentifier, ResourceTypes
 
 from src.thing.thing_event import ThingEvent, ThingStatus
@@ -18,7 +18,6 @@ class TestHueEventConverter(unittest.TestCase):
         return Light(
             id="2d157ce5-fe4c-4113-af2a-6afaa7d5a0cb",
             id_v1="/lights/9",
-            metadata=LightMetaData(archetype="table_wash", name="my thing name 123"),
             on=OnFeature(on=False),
             dimming=DimmingFeature(brightness=69.0, min_dim_level=10.0),
             color_temperature=None,
@@ -46,13 +45,15 @@ class TestHueEventConverter(unittest.TestCase):
         )
 
     @classmethod
-    def create_grouped_light_item_on(cls):
+    def create_grouped_light_item_on(cls) -> GroupedLight:
+        id = "7a335802-b3d0-40bf-8f85-b7c11307fa50"
         return GroupedLight(
-            id="7a335802-b3d0-40bf-8f85-b7c11307fa50",
+            id=id,
             id_v1="/groups/9",
             on=OnFeature(on=True),
             alert=AlertFeature(action_values=[AlertEffectType.BREATHE]),
             type=ResourceTypes.GROUPED_LIGHT,
+            owner=ResourceIdentifier(rid=id, rtype=ResourceTypes.GROUPED_LIGHT),
         )
 
     def test_light_item(self):
@@ -63,7 +64,7 @@ class TestHueEventConverter(unittest.TestCase):
             event_exp = ThingEvent()
             event_exp.id = hue_item.id
 
-            event_exp.name = hue_item.metadata.name
+            # event_exp.name = None  # name has to be matched via device
             event_exp.type = "light"
             event_exp.status = ThingStatus.ON if is_on else ThingStatus.OFF
             event_exp.brightness = expected_brightness
