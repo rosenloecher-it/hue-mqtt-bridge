@@ -69,7 +69,7 @@ class HueExplorer(HueConnectorBase):
                 if device:
                     name = device.name
             lights.append(HueItem(item=light, name=name, type=light.type.name))
-        lights = sorted(lights, key=lambda l: l.name.lower())
+        lights = sorted(lights, key=lambda i: i.name.lower())
         cache.lights = OrderedDict({c.item.id: c for c in lights})
 
         return cache
@@ -107,7 +107,7 @@ class HueExplorer(HueConnectorBase):
                     light_item = hue_cache.lights.get(child_resource.rid)
                     if light_item:
                         lights.append(light_item)
-            lights = sorted(lights, key=lambda l: l.name.lower())
+            lights = sorted(lights, key=lambda i: i.name.lower())
             for light in lights:
                 self.print(f"{offset}LIGHT {light.name} ({light.item.id})")
 
